@@ -1,0 +1,111 @@
+# =============================================================================
+# recording-rules.yaml — Prometheus Recording Rules + Alert Rules 모음
+# =============================================================================
+# Recording Rule 이란?
+#   "자주 쓰는 PromQL 쿼리를 미리 계산해 새 시계열로 저장"
+#   • 대시보드 로딩 빠르게 (복잡한 쿼리를 매번 안 계산)
+#   • 알람 평가 빠르게
+#   • 다른 쿼리에서 재사용 (계층화)
+#
+# 명명 규칙 (권장):
+#   level:metric:operations
+#   namespace:http_rps:sum    ← namespace 단위로 http_rps를 sum 한 것
+#   pod:cpu_utilization:ratio ← pod 단위로 cpu utilization 의 ratio
+#
+# 동작:
+#   30초마다 (interval) expr 평가 → record 이름의 시계열로 저장
+#
+# 적용:  kubectl apply -f recording-rules.yaml
+# 확인:  Prometheus UI → 쿼리에 namespace:http_rps:sum 입력 → 그래프 나오면 OK
+# =============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: eks-study-recording
+  namespace: monitoring
+  labels:
+    release: kps                            # kube-prometheus-stack이 픽업하는 라벨
+
+spec:
+  groups:
+    # ── Group 1: Recording Rules (계산만, 알람 없음) ──
+    - name: order-msa.recording
+      interval: 30s                         # 30초마다 평가 (기본 1m)
+
+      rules:
+        # ── 룰 1: 서비스별 RPS (요청/초) ──
+        - record: namespace:http_rps:sum    # 새 메트릭 이름
+          expr: |
+            sum by (namespace, service) (
+              rate(gin_request_duration_seconds_count[1m])
+            )
+          # Counter는 단조 증가만 함 → rate(...[1m]) 으로 초당 변화량 계산
+          # by (namespace, service) = 두 라벨 단위로 합산
+
+        # ── 룰 2: 서비스별 에러율 ──
+        - record: namespace:http_error_rate:ratio
+          expr: |
+            sum by (namespace, service) (
+              rate(gin_request_duration_seconds_count{code=~"5.."}[1m])
+            )
+              /
+            sum by (namespace, service) (
+              rate(gin_request_duration_seconds_count[1m])
+            )
+          # 5xx 에러 RPS / 전체 RPS = 에러율 (0~1)
+          # code=~"5.." : 정규식. 5로 시작하는 모든 코드 (500, 502, 503...)
+
+        # ── 룰 3: p99 latency ──
+        - record: namespace:http_latency_p99:seconds
+          expr: |
+            histogram_quantile(0.99,
+              sum by (le, namespace, service) (
+                rate(gin_request_duration_seconds_bucket[5m])
+              )
+            )
+          # histogram_quantile: 누적 히스토그램에서 분위수 계산
+          # 0.99 = p99 (상위 1%만 이보다 느림)
+          # le ("less than or equal") 라벨 보존 필수 (히스토그램 분위수의 핵심)
+
+        # ── 룰 4: Pod별 CPU 사용률 (request 대비) ──
+        - record: pod:cpu_utilization:ratio
+          expr: |
+            sum by (namespace, pod) (rate(container_cpu_usage_seconds_total[1m]))
+              /
+            sum by (namespace, pod) (kube_pod_container_resource_requests{resource="cpu"})
+          # 실제 CPU 사용 / requests = 사용률
+          # 1.0 = requests 100% 사용중 / 0.5 = 50% 사용중
+
+    # ── Group 2: Alert Rules (위 recording rules 활용) ──
+    - name: order-msa.alerts
+      rules:
+        # 에러율 > 5% 가 5분 지속 시 알람
+        - alert: HighErrorRate
+          expr: namespace:http_error_rate:ratio > 0.05    # ← 위에서 만든 recording rule 재사용!
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.service }} 에러율 {{ $value | humanizePercentage }}"
+                                                          # humanizePercentage: 0.05 → 5%
+            description: "5분 동안 5xx 비율이 5% 초과"
+
+        # p99 > 1초가 10분 지속 시 알람 (느린 응답)
+        - alert: HighLatencyP99
+          expr: namespace:http_latency_p99:seconds > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.service }} p99 > 1s ({{ $value }}s)"
+
+        # CPU < 20%가 1시간 지속 → over-provisioned (비용 낭비)
+        - alert: OverProvisioned
+          expr: pod:cpu_utilization:ratio < 0.2
+          for: 1h
+          labels:
+            severity: info                                # info = 알람 아닌 정보 통지
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} CPU 사용률 < 20% (1h)"
+            description: "리소스 right-sizing 필요 (requests 줄이거나 노드 크기 조정)"

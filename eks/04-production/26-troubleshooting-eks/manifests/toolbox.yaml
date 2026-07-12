@@ -1,0 +1,15 @@
+# Source: eks/04-production/26-troubleshooting-eks/lab-02-runbook-toolbox.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: toolbox
+  namespace: default
+  annotations:
+    karpenter.sh/do-not-disrupt: "true"      # 17 — 진단 중에 사라지면 곤란
+spec:
+  containers:
+  - name: nettools
+    image: ghcr.io/nicolaka/netshoot:latest   # ping/dig/traceroute/ss/tcpdump/curl
+    command: [sleep, "infinity"]
+    resources: { requests: { cpu: 50m, memory: 64Mi } }

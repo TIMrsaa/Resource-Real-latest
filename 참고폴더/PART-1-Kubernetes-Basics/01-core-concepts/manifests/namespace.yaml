@@ -1,0 +1,38 @@
+# =============================================================================
+# namespace.yaml — Namespace 2개 만들기 (논리적 격리 공간)
+# =============================================================================
+# Namespace는 무엇?
+#   • 클러스터를 가상으로 칸막이 친 공간
+#   • 같은 이름의 객체를 NS별로 가질 수 있음 (prod-app/web ≠ dev-app/web)
+#   • RBAC, ResourceQuota, NetworkPolicy 등이 NS 단위로 적용 가능
+#
+# 격리되는 것: Pod, Service, ConfigMap, Secret 등 (대부분 객체)
+# 격리 안 됨:  Node, PV, StorageClass, ClusterRole (cluster-scoped)
+#
+# DNS:
+#   같은 NS 내:  http://my-svc/
+#   다른 NS:     http://my-svc.other-ns.svc.cluster.local/
+#
+# 적용:  kubectl apply -f namespace.yaml
+# 확인:  kubectl get ns
+# =============================================================================
+
+# ── NS 1번: lab-team-a ─────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab-team-a              # NS 이름 (DNS 호환: 소문자 + 하이픈만)
+  labels:
+    purpose: learning           # NS에도 라벨 가능. 모니터링 라벨링 등에 활용
+
+---
+# YAML에서 `---` 는 "여기서 문서 1개 끝, 다음 문서 시작" 구분자
+# 한 파일에 여러 객체를 정의할 때 자주 쓰는 패턴
+
+# ── NS 2번: lab-team-b ─────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab-team-b
+  labels:
+    purpose: learning

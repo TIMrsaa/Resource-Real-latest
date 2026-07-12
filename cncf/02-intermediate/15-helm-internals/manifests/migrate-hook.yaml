@@ -1,0 +1,19 @@
+# Source: cncf/02-intermediate/15-helm-internals/lab-02-hooks-and-gitops.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "demo.fullname" . }}-migrate
+  annotations:
+    "helm.sh/hook": pre-upgrade,pre-install
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: busybox
+          command: ["sh","-c","echo 'running migration v{{ .Values.migrationVersion | default 1 }}'; sleep 5; echo done"]

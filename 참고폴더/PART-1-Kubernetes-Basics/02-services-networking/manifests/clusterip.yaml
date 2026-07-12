@@ -1,0 +1,55 @@
+# =============================================================================
+# clusterip.yaml — Deployment + ClusterIP Service (클러스터 내부 노출)
+# =============================================================================
+# 왜 Service가 필요한가?
+#   Pod IP는 변한다 (재시작 시 새 IP 할당). 다른 Pod가 어떻게 안정적으로 호출?
+#   → Service가 가상 IP + DNS 이름을 제공. Pod 죽고 살아도 Service IP는 불변.
+#
+# Service 타입:
+#   • ClusterIP    : 클러스터 내부 전용 (기본값, 가장 많이 씀)
+#   • NodePort     : 모든 노드의 30000~32767 포트로 외부 노출 (실무 X)
+#   • LoadBalancer : 클라우드 LB 자동 프로비저닝 (AWS NLB 등)
+#   • ExternalName : 외부 DNS의 CNAME (외부 서비스를 K8s 안에서 부를 때)
+#
+# 동작:
+#   클라이언트 → http://web/ (DNS) → ClusterIP (가상) → kube-proxy → Pod 중 1개
+#
+# 적용:  kubectl apply -f clusterip.yaml
+# 테스트: kubectl run -it --rm dbg --image=alpine -- sh
+#         (안에서) wget -qO- http://web/
+# =============================================================================
+
+# ── 워크로드: Deployment + Pod 3개 ─────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3                   # 3개의 Pod이 트래픽을 분담
+  selector:
+    matchLabels: { app: web }   # YAML 인라인 맵: { key: value } 표기
+  template:
+    metadata:
+      labels: { app: web }      # ← Service의 selector가 이 라벨로 Pod를 찾음
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+
+---
+# ── Service: 위 Pod 3개에 안정적인 진입점 제공 ───────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: web                     # Service 이름 = 클러스터 내 DNS 이름이 됨
+                                # 다른 Pod에서 http://web/ 으로 호출 가능
+spec:
+  type: ClusterIP               # 기본값. 클러스터 내부에서만 접근 가능
+  selector:                     # 이 라벨을 가진 Pod 들을 백엔드로 묶음
+    app: web                    # ↑ Deployment template의 라벨과 일치
+  ports:
+    - port: 80                  # Service의 포트 (다른 Pod가 호출할 때 사용)
+      targetPort: 80            # 실제 Pod의 containerPort. 다르게 설정 가능
+                                # 예: port:80 → targetPort:8080 (Service 80번 호출이 Pod 8080으로)

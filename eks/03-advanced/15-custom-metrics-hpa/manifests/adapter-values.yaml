@@ -1,0 +1,17 @@
+# Source: eks/03-advanced/15-custom-metrics-hpa/lab-01-prometheus-adapter.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+prometheus:
+  url: http://prometheus-server.monitoring.svc
+  port: 80
+rules:
+  default: false
+  custom:
+  - seriesQuery: 'http_request_duration_seconds_count{namespace!="",pod!=""}'
+    resources:
+      overrides:
+        namespace: { resource: namespace }
+        pod: { resource: pod }
+    name:
+      matches: "^(.*)_count$"
+      as: "http_requests_per_second"          # HPA가 부를 이름
+    metricsQuery: 'sum(rate(<<.Series>>{<<.LabelMatchers>>}[1m])) by (<<.GroupBy>>)'

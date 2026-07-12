@@ -1,0 +1,15 @@
+# Source: k8s/02-intermediate/12-scheduling/lab-01-selector-affinity-taint.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata: { name: prefer-ssd }
+spec:
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+          - { key: disktype, operator: In, values: [nvme] }   # 존재하지 않는 조건!
+  containers:
+  - { name: c, image: public.ecr.aws/docker/library/busybox:stable, command: [sleep, "3600"] }

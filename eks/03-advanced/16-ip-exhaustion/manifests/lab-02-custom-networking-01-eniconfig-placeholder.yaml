@@ -1,0 +1,10 @@
+# Source: eks/03-advanced/16-ip-exhaustion/lab-02-custom-networking.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: crd.k8s.amazonaws.com/v1alpha1
+kind: ENIConfig
+metadata: { name: $az }          # ★ 이름 = AZ명 — 라벨 매칭의 열쇠
+spec:
+  subnet: ${PODNET[$az]}
+  securityGroups: [$SG]

@@ -1,0 +1,9 @@
+# Source: k8s/02-intermediate/19-statefulset/lab-02-ordering-updates.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: db-pdb }
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: { app: db }

@@ -1,0 +1,18 @@
+# Source: cicd/02-intermediate/08-gha-self-hosted/lab-01-arc-on-eks.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: on-arc
+on: [push, workflow_dispatch]
+jobs:
+  where-am-i:
+    runs-on: eks-runners          # ★ 스케일셋 이름
+    steps:
+      - name: 나는 어디서 도는가
+        run: |
+          echo "hostname : $(hostname)"
+          echo "이것은 Pod의 이름이다"
+          cat /etc/os-release | head -2
+      - name: 클러스터 안에 있는가 (VPC 접근이 이 러너의 존재 이유)
+        run: |
+          getent hosts kubernetes.default.svc && echo "✅ 클러스터 DNS 도달" || echo "DNS 불가"

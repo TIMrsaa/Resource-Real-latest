@@ -1,0 +1,23 @@
+# Source: k8s/03-advanced/23-admission-webhooks/lab-02-webhook.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata: { name: team-label-webhook }
+webhooks:
+- name: team-label.example.com
+  clientConfig:
+    service: { name: demo-webhook, namespace: webhook, path: /, port: 443 }
+    caBundle: $CA_BUNDLE
+  rules:
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    operations: ["CREATE"]
+    resources: ["pods"]
+  failurePolicy: Fail
+  timeoutSeconds: 5
+  sideEffects: None
+  admissionReviewVersions: ["v1"]
+  namespaceSelector:                 # ★ 방어: 실험 ns에만 + 자기 자신/시스템 제외
+    matchLabels: { webhook-test: "true" }

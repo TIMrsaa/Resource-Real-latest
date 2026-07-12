@@ -1,0 +1,11 @@
+# Source: observability/03-advanced/16-adot/lab-01-adot-addon-pipelines.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata: { name: default, namespace: shop }
+spec:
+  exporter: { endpoint: http://adot-collector.observability:4318 }
+  propagators: [tracecontext]
+  sampler: { type: parentbased_traceidratio, argument: "1.0" }
+  python:
+    env: [{ name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }]

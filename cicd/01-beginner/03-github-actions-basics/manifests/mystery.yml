@@ -1,0 +1,24 @@
+# Source: cicd/01-beginner/03-github-actions-basics/lab-01-first-workflow.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: mystery
+on: workflow_dispatch
+jobs:
+  steps-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 셸 변수로 시도 (실패할 것)
+        run: export MY_VAR="hello"
+      - name: 읽기 시도
+        run: echo "셸 변수 = [$MY_VAR]"
+
+      - name: GITHUB_ENV로 시도
+        run: echo "MY_VAR2=world" >> "$GITHUB_ENV"
+      - name: 읽기
+        run: echo "GITHUB_ENV = [$MY_VAR2]"
+
+      - name: 파일시스템은 공유되나요?
+        run: echo "artifact content" > shared.txt
+      - name: 파일 읽기
+        run: cat shared.txt

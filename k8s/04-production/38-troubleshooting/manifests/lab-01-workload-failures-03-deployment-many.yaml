@@ -1,0 +1,20 @@
+# Source: k8s/04-production/38-troubleshooting/lab-01-workload-failures.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: many
+  namespace: dr-lab
+  labels: { app: many }
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: many }
+  template:
+    metadata:
+      labels: { app: many }
+    spec:
+      containers:
+        - name: many
+          image: public.ecr.aws/docker/library/busybox:stable
+          command: ["sleep", "600"]

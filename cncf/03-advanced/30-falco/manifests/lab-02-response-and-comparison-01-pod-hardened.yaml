@@ -1,0 +1,14 @@
+# Source: cncf/03-advanced/30-falco/lab-02-response-and-comparison.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata: { name: hardened }
+spec:
+  securityContext:
+    seccompProfile: { type: RuntimeDefault }   # ★ 위험한 시스템콜 차단
+  containers:
+    - name: app
+      image: nginx
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities: { drop: ["ALL"] }

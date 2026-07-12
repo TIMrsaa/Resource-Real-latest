@@ -1,0 +1,15 @@
+# Source: observability/01-beginner/01-observability-foundations/lab-02-monitoring-vs-observability.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: api-v2 }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: api, ver: v2 } }
+  template:
+    metadata: { labels: { app: api, ver: v2 } }
+    spec:
+      containers:
+        - name: api
+          image: kennethreitz/httpbin
+          ports: [{ containerPort: 80 }]

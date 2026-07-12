@@ -1,0 +1,66 @@
+# Source: observability/03-advanced/20-continuous-profiling/lab-01-flamegraph-cpu.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: app-src, namespace: shop }
+data:
+  main.go: |
+    package main
+    import (
+      "crypto/sha256"
+      "net/http"
+      "os"
+      "github.com/grafana/pyroscope-go"
+    )
+    func wastefulHash(data []byte) []byte {     // ★ 범인: 불필요한 반복 해시
+      h := data
+      for i := 0; i < 2000; i++ {
+        s := sha256.Sum256(h); h = s[:]
+      }
+      return h
+    }
+    func cheapWork(data []byte) []byte {
+      s := sha256.Sum256(data); return s[:]
+    }
+    func handler(w http.ResponseWriter, r *http.Request) {
+      _ = cheapWork([]byte("payload"))
+      _ = wastefulHash([]byte("payload"))       // 매 요청마다!
+      w.Write([]byte("ok"))
+    }
+    func main() {
+      pyroscope.Start(pyroscope.Config{
+        ApplicationName: "payment",
+        ServerAddress:   os.Getenv("PYROSCOPE_URL"),
+      })
+      http.HandleFunc("/", handler)
+      http.ListenAndServe(":8080", nil)
+    }
+  go.mod: |
+    module app
+    go 1.22
+    require github.com/grafana/pyroscope-go v1.1.1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: payment, namespace: shop }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: payment } }
+  template:
+    metadata: { labels: { app: payment } }
+    spec:
+      containers:
+        - name: app
+          image: golang:1.22
+          workingDir: /src
+          command: ["sh","-c","cp /cm/* . && go mod tidy -e && go run main.go"]
+          env:
+            - { name: PYROSCOPE_URL, value: "http://pyroscope.profiling.svc:4040" }
+          ports: [{ containerPort: 8080 }]
+          volumeMounts: [{ name: src, mountPath: /cm }]
+      volumes: [{ name: src, configMap: { name: app-src } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: payment, namespace: shop }
+spec: { selector: { app: payment }, ports: [{ port: 8080 }] }

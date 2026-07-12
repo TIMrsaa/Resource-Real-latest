@@ -1,0 +1,14 @@
+# Source: observability/04-production/24-scaling-observability/lab-01-thanos-global-view.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+prometheus:
+  prometheusSpec:
+    externalLabels:
+      cluster: $region                    # ★ 글로벌 뷰에서 구분할 라벨
+    retention: 6h                          # 로컬은 짧게 — 장기는 스토리지로
+    thanos:                                # ★ Operator가 sidecar를 붙여줍니다
+      objectStorageConfig:
+        existingSecret: { name: thanos-objstore, key: objstore.yml }
+grafana: { enabled: false }
+alertmanager: { enabled: false }

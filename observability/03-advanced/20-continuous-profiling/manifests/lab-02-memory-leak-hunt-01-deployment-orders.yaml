@@ -1,0 +1,65 @@
+# Source: observability/03-advanced/20-continuous-profiling/lab-02-memory-leak-hunt.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: leaky-src, namespace: shop }
+data:
+  main.go: |
+    package main
+    import (
+      "fmt"
+      "net/http"
+      "os"
+      "github.com/grafana/pyroscope-go"
+    )
+    var cache = map[string][]byte{}          // ★ 무한 캐시 — 전형적 누수
+    var counter int
+    func leakyCache(key string) {
+      cache[key] = make([]byte, 64*1024)     // 요청마다 64KB, 영원히 보유
+    }
+    func handler(w http.ResponseWriter, r *http.Request) {
+      counter++
+      leakyCache(fmt.Sprintf("req-%d", counter))   // 키가 매번 달라 캐시 히트 0
+      w.Write([]byte("ok"))
+    }
+    func main() {
+      pyroscope.Start(pyroscope.Config{
+        ApplicationName: "orders",
+        ServerAddress:   os.Getenv("PYROSCOPE_URL"),
+        ProfileTypes: []pyroscope.ProfileType{
+          pyroscope.ProfileCPU,
+          pyroscope.ProfileInuseObjects, pyroscope.ProfileInuseSpace,   // ★ inuse!
+          pyroscope.ProfileAllocObjects, pyroscope.ProfileAllocSpace,
+        },
+      })
+      http.HandleFunc("/", handler)
+      http.ListenAndServe(":8080", nil)
+    }
+  go.mod: |
+    module app
+    go 1.22
+    require github.com/grafana/pyroscope-go v1.1.1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: orders, namespace: shop }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: orders } }
+  template:
+    metadata: { labels: { app: orders } }
+    spec:
+      containers:
+        - name: app
+          image: golang:1.22
+          workingDir: /src
+          command: ["sh","-c","cp /cm/* . && go mod tidy -e && go run main.go"]
+          env: [{ name: PYROSCOPE_URL, value: "http://pyroscope.profiling.svc:4040" }]
+          resources: { limits: { memory: "512Mi" } }     # OOM의 무대
+          volumeMounts: [{ name: src, mountPath: /cm }]
+      volumes: [{ name: src, configMap: { name: leaky-src } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: orders, namespace: shop }
+spec: { selector: { app: orders }, ports: [{ port: 8080 }] }

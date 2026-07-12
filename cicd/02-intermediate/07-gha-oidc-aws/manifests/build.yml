@@ -1,0 +1,53 @@
+# Source: cicd/02-intermediate/07-gha-oidc-aws/lab-01-oidc-setup.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: build
+on:
+  push: { branches: [main] }
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  id-token: write      # ★ OIDC 토큰 요청 (기본은 없습니다)
+  contents: read
+
+env:
+  AWS_REGION: $AWS_REGION
+  ECR: $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/cicd-oidc-app
+  ROLE: arn:aws:iam::$ACCOUNT_ID:role/gha-oidc-lab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 시크릿이 없음을 확인
+        run: |
+          if [ -z "\${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "✅ 저장된 AWS 키 없음"
+          fi
+
+      - name: OIDC로 역할 위임
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: \${{ env.ROLE }}
+          aws-region: \${{ env.AWS_REGION }}
+          role-session-name: gha-\${{ github.run_id }}    # CloudTrail 추적용
+
+      - name: 나는 누구인가
+        run: aws sts get-caller-identity
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 빌드 & 푸시 (main에서만)
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: \${{ env.ECR }}:\${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

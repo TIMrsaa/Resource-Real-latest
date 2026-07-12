@@ -1,0 +1,24 @@
+# Source: cncf/02-intermediate/17-flux/lab-01-toolkit-composition.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata: { name: podinfo-a, namespace: flux-system }
+spec:
+  interval: 2m
+  path: ./kustomize
+  prune: true
+  sourceRef: { kind: GitRepository, name: podinfo }
+  targetNamespace: env-a
+  healthChecks:
+    - { apiVersion: apps/v1, kind: Deployment, name: podinfo, namespace: env-a }
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata: { name: podinfo-b, namespace: flux-system }
+spec:
+  interval: 5m                       # ★ 다른 주기!
+  path: ./kustomize
+  prune: true
+  sourceRef: { kind: GitRepository, name: podinfo }   # ★ 같은 소스
+  targetNamespace: env-b
+  dependsOn: [{ name: podinfo-a }]   # ★ a가 Ready여야 b 적용

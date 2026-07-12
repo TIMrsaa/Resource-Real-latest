@@ -1,0 +1,10 @@
+# Source: cncf/03-advanced/22-cilium/lab-01-ebpf-datapath.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  disableDefaultCNI: true      # CNI 없음 (Cilium이 맡습니다)
+  kubeProxyMode: none          # ★ kube-proxy도 없습니다!
+nodes:
+  - role: control-plane
+  - role: worker

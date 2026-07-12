@@ -1,0 +1,11 @@
+# Source: cncf/03-advanced/31-opa/lab-02-gatekeeper-and-domains.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredLabels
+metadata: { name: ns-require-team }
+spec:
+  enforcementAction: dryrun          # ★ 07의 audit부터 (dryrun→deny)
+  match:
+    kinds: [{ apiGroups: [""], kinds: ["Namespace"] }]
+  parameters:
+    labels: ["team"]

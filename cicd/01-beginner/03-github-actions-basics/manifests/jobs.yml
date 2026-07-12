@@ -1,0 +1,32 @@
+# Source: cicd/01-beginner/03-github-actions-basics/lab-01-first-workflow.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: jobs
+on: workflow_dispatch
+jobs:
+  producer:
+    runs-on: ubuntu-latest
+    outputs:
+      msg: ${{ steps.gen.outputs.msg }}          # ① 작은 값
+    steps:
+      - id: gen
+        run: |
+          echo "msg=hello-from-producer" >> "$GITHUB_OUTPUT"
+          echo "big file content" > build.txt
+      - uses: actions/upload-artifact@v4          # ② 파일
+        with: { name: build, path: build.txt }
+
+  consumer:
+    needs: producer                                # ③ 순서
+    runs-on: ubuntu-latest
+    steps:
+      - name: 파일이 그냥 있을까요? (없습니다)
+        run: |
+          cat build.txt 2>&1 || echo "→ 없음: 잡은 서로 다른 러너다"
+      - name: outputs는 옵니다
+        run: echo "outputs = ${{ needs.producer.outputs.msg }}"
+      - uses: actions/download-artifact@v4
+        with: { name: build }
+      - name: 이제 있습니다
+        run: cat build.txt

@@ -1,0 +1,68 @@
+# =============================================================================
+# values.yaml — Helm 차트의 "기본 입력값"
+# =============================================================================
+# Helm 동작:
+#   templates/*.yaml + values.yaml → 렌더링 → K8s 매니페스트 → apply
+#
+# 사용자가 설치할 때:
+#   helm install my-order ./charts/order-service \
+#     --set image.repository=123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/order \
+#     --set replicaCount=5
+#   → 여기 적힌 기본값을 --set 으로 덮어씌움
+#
+# 또는 별도 파일로:
+#   helm install my-order ./charts/order-service -f values-prod.yaml
+#
+# 미리보기 (apply 안 하고 렌더 결과만):
+#   helm template my-order ./charts/order-service
+# =============================================================================
+
+# ── Pod 복제본 수 ──────────────────────────────────────────────
+replicaCount: 2
+
+# ── 컨테이너 이미지 ────────────────────────────────────────────
+image:
+  repository: ""           # 필수 입력! 비어있으면 helm install 시 에러
+                           # 예: 123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/eks-study/order-service
+  tag: latest              # latest는 학습용. 실무에선 git SHA 또는 semver 사용
+  pullPolicy: IfNotPresent # 노드에 이미지 있으면 안 받음 (=캐시 우선)
+                           # Always = 항상 받음 (latest 태그 쓸 때 권장)
+                           # Never  = 절대 안 받음 (오프라인 환경)
+
+# ── Service 설정 ───────────────────────────────────────────────
+service:
+  type: ClusterIP          # ClusterIP / NodePort / LoadBalancer
+  port: 80                 # Service의 외부 포트 (다른 Pod가 호출 시)
+  targetPort: 8080         # 컨테이너의 실제 포트 (Go 앱이 listen하는 포트)
+  metricsPort: 9090        # Prometheus 메트릭 노출 포트 (별도)
+
+# ── 환경 변수 ──────────────────────────────────────────────────
+# Deployment template에서 range로 순회하며 env로 주입
+env:
+  PORT: "8080"             # 따옴표 필수 (숫자 아니라 문자열로)
+  LOG_LEVEL: info
+
+# ── 자원 요청/한도 ─────────────────────────────────────────────
+resources:
+  requests:                # 스케줄러가 노드 선택 시 사용
+    cpu: 50m               # 50밀리CPU = 0.05 vCPU
+    memory: 64Mi
+  limits:                  # 초과 시 throttle/OOMKill
+    cpu: 200m
+    memory: 128Mi
+
+# ── HPA (자동 스케일링) ────────────────────────────────────────
+autoscaling:
+  enabled: false           # true로 켜면 hpa.yaml이 렌더됨
+  minReplicas: 2           # 최소 Pod 수
+  maxReplicas: 10          # 최대 Pod 수
+  targetCPUUtilizationPercentage: 70   # 평균 CPU 70% 넘으면 스케일 아웃
+
+# ── Ingress (외부 노출) ────────────────────────────────────────
+ingress:
+  enabled: false           # true로 켜면 ingress.yaml이 렌더됨
+  className: ""            # "alb" (AWS) / "nginx" 등
+  annotations: {}          # ALB의 경우 alb.ingress.kubernetes.io/* 어노테이션 필요
+  host: order.example.com  # 어떤 도메인으로 들어오면 이 서비스로 라우팅
+  path: /                  # 경로 prefix
+  pathType: Prefix         # Prefix / Exact / ImplementationSpecific

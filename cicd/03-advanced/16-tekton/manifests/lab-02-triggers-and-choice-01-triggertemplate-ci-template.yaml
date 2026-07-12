@@ -1,0 +1,36 @@
+# Source: cicd/03-advanced/16-tekton/lab-02-triggers-and-choice.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+# ① TriggerTemplate: 무엇을 생성할지 (PipelineRun)
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata: { name: ci-template }
+spec:
+  params:
+    - name: git-sha
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata: { generateName: ci-triggered- }
+      spec:
+        pipelineRef: { name: ci }
+        workspaces: [{ name: shared, emptyDir: {} }]
+---
+# ② TriggerBinding: webhook 페이로드에서 값 추출
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata: { name: ci-binding }
+spec:
+  params:
+    - name: git-sha
+      value: $(body.head_commit.id)
+---
+# ③ EventListener: webhook 수신 Pod
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata: { name: ci-listener }
+spec:
+  triggers:
+    - bindings: [{ ref: ci-binding }]
+      template: { ref: ci-template }

@@ -1,0 +1,18 @@
+# Source: k8s/04-production/37-scale-tuning/lab-02-kwok-1000-nodes.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: horde }
+spec:
+  replicas: 5000
+  selector: { matchLabels: { app: horde } }
+  template:
+    metadata: { labels: { app: horde } }
+    spec:
+      nodeSelector: { type: kwok }
+      tolerations:
+      - { key: kwok.x-k8s.io/node, operator: Exists }
+      containers:
+      - name: c
+        image: fake          # kwok가 연기하므로 진짜 이미지 불필요
+        resources: { requests: { cpu: 100m, memory: 128Mi } }

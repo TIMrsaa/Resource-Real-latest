@@ -1,0 +1,14 @@
+# Source: cicd/02-intermediate/09-aws-codepipeline/lab-01-pipeline-basics.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+version: 0.2
+phases:
+  build:
+    commands:
+      - echo "빌드 중 — 소스가 여기 도착했다"
+      - ls -la
+      - echo "artifact-$(date +%s)" > build-output.txt
+artifacts:
+  files:
+    - build-output.txt          # ★ 이 파일이 BuildArtifact가 되어 다음 스테이지로

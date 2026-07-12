@@ -1,0 +1,27 @@
+# 노드마다 1개 — 노드 hostname을 1분마다 출력하는 미니 에이전트
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+spec:
+  selector:
+    matchLabels:
+      app: node-agent
+  template:
+    metadata:
+      labels:
+        app: node-agent
+    spec:
+      containers:
+      - name: agent
+        image: public.ecr.aws/docker/library/busybox:stable
+        command: ["sh", "-c", "while true; do echo \"agent on $NODE_NAME\"; sleep 60; done"]
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:                 # Downward API: 자기가 떠 있는 노드 이름 주입
+              fieldPath: spec.nodeName
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi

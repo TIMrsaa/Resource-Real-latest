@@ -1,0 +1,22 @@
+# Source: k8s/03-advanced/25-scheduler-internals/lab-02-second-scheduler.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: cost-scheduler, namespace: scheduler-lab }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: cost-scheduler } }
+  template:
+    metadata: { labels: { app: cost-scheduler } }
+    spec:
+      serviceAccountName: cost-scheduler
+      volumes:
+      - { name: config, configMap: { name: cost-scheduler-config } }
+      containers:
+      - name: scheduler
+        image: registry.k8s.io/kube-scheduler:$VER
+        command: ["kube-scheduler", "--config=/etc/kubernetes/config.yaml", "-v=2"]
+        volumeMounts: [{ name: config, mountPath: /etc/kubernetes }]
+        resources: { requests: { cpu: 50m, memory: 64Mi } }

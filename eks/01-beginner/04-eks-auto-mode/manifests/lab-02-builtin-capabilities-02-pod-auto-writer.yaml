@@ -1,0 +1,22 @@
+# Source: eks/01-beginner/04-eks-auto-mode/lab-02-builtin-capabilities.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: auto-data }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: auto-ebs
+  resources: { requests: { storage: 1Gi } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: auto-writer }
+spec:
+  nodeSelector: { eks.amazonaws.com/compute-type: auto }
+  volumes: [{ name: d, persistentVolumeClaim: { claimName: auto-data } }]
+  containers:
+  - name: c
+    image: public.ecr.aws/docker/library/busybox:stable
+    command: [sh, -c, 'echo automode-data > /data/f && sleep 3600']
+    volumeMounts: [{ name: d, mountPath: /data }]
+    resources: { requests: { cpu: 250m, memory: 256Mi } }

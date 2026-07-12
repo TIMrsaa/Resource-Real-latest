@@ -1,0 +1,27 @@
+# Source: observability/02-intermediate/08-prometheus-on-k8s/lab-01-stack-and-servicemonitor.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: payment, namespace: shop }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: payment } }
+  template:
+    metadata: { labels: { app: payment } }
+    spec:
+      containers:
+        - name: app
+          image: quay.io/brancz/prometheus-example-app:v0.5.0
+          ports: [{ name: http, containerPort: 8080 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment
+  namespace: shop
+  labels: { app: payment }
+spec:
+  selector: { app: payment }
+  ports:
+    - name: metrics          # ★ ServiceMonitor가 이 "이름"을 참조
+      port: 8080

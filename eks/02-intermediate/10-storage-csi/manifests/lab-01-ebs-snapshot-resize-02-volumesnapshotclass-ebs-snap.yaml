@@ -1,0 +1,14 @@
+# Source: eks/02-intermediate/10-storage-csi/lab-01-ebs-snapshot-resize.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata: { name: ebs-snap }
+driver: ebs.csi.aws.com
+deletionPolicy: Delete
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata: { name: data-snap, namespace: storage-lab }
+spec:
+  volumeSnapshotClassName: ebs-snap
+  source: { persistentVolumeClaimName: data }

@@ -1,0 +1,33 @@
+# Source: observability/04-production/22-observability-cost/lab-01-meta-observability.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-health
+  namespace: monitoring
+  labels: { release: monitoring }
+spec:
+  groups:
+    - name: obs.health
+      rules:
+        - alert: LogPipelineDropping
+          expr: rate(fluentbit_output_dropped_records_total[5m]) > 0
+          for: 5m
+          labels: { severity: page, team: platform }
+          annotations: { summary: "로그 유실 발생 중 — 버퍼/목적지 점검 (06)" }
+        - alert: LogPipelineRetrying
+          expr: rate(fluentbit_output_retries_total[5m]) > 1
+          for: 10m
+          labels: { severity: ticket, team: platform }
+          annotations: { summary: "로그 재시도 지속 — 목적지 불안 (계단 1단)" }
+        - alert: MetricsSeriesSurge
+          expr: |
+            prometheus_tsdb_head_series
+            > 1.5 * (prometheus_tsdb_head_series offset 1h)
+          for: 10m
+          labels: { severity: page, team: platform }
+          annotations: { summary: "시계열 1시간 새 50% 급증 — 카디널리티 폭발 의심 (03)" }
+        - alert: ObservabilityWatchdog     # ★ dead man's switch (14)
+          expr: vector(1)
+          labels: { severity: none, team: platform }
+          annotations: { summary: "항상 발화 — 이 알림이 끊기면 알림 체계가 죽은 것" }

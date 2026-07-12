@@ -1,0 +1,36 @@
+# Source: observability/03-advanced/16-adot/lab-01-adot-addon-pipelines.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata: { name: adot, namespace: observability }
+spec:
+  mode: deployment
+  serviceAccount: adot-collector          # ★ IRSA
+  config:
+    receivers:
+      otlp: { protocols: { grpc: {}, http: {} } }
+    processors:
+      memory_limiter: { check_interval: 1s, limit_percentage: 75, spike_limit_percentage: 20 }
+      k8sattributes: {}
+      batch: {}
+    exporters:
+      awsxray:
+        region: $REGION
+      prometheusremotewrite:
+        endpoint: ${AMP_ENDPOINT}api/v1/remote_write
+        auth: { authenticator: sigv4auth }
+    extensions:
+      sigv4auth: { region: $REGION, service: aps }
+    service:
+      extensions: [sigv4auth]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, batch]
+          exporters: [awsxray]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [prometheusremotewrite]

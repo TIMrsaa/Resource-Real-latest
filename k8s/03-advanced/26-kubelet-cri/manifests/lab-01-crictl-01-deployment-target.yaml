@@ -1,0 +1,18 @@
+# Source: k8s/03-advanced/26-kubelet-cri/lab-01-crictl.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: target
+  labels: { app: target }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: target }
+  template:
+    metadata:
+      labels: { app: target }
+    spec:
+      containers:
+        - name: target
+          image: public.ecr.aws/nginx/nginx:1.27

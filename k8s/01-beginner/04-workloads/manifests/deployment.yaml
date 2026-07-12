@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web              # template.metadata.labels와 반드시 일치
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1           # 정원보다 1개까지 더 띄울 수 있음
+      maxUnavailable: 0     # 정원 미달은 허용 안 함 (가장 안전한 조합)
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - name: web
+        image: public.ecr.aws/nginx/nginx:1.27
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+        readinessProbe:      # 이게 있어야 롤링 업데이트가 진짜 무중단이 된다 (모듈 14 심화)
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 2
+          periodSeconds: 3

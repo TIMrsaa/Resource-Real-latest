@@ -1,0 +1,48 @@
+# Source: cicd/02-intermediate/07-gha-oidc-aws/lab-02-scope-and-environments.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: deploy
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  staging:
+    environment: staging                    # ★ sub = repo:...:environment:staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::$ACCOUNT_ID:role/gha-staging-lab
+          aws-region: $AWS_REGION
+          role-session-name: staging-\${{ github.run_id }}
+      - run: aws sts get-caller-identity --query Arn --output text
+
+  production:
+    needs: staging
+    environment: production                 # ★ 승인 후에만 이 sub를 갖습니다
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::$ACCOUNT_ID:role/gha-production-lab
+          aws-region: $AWS_REGION
+          role-session-name: prod-\${{ github.run_id }}
+      - run: aws sts get-caller-identity --query Arn --output text
+
+  # 통제 검증: staging 잡이 production 역할을 훔칠 수 있나요?
+  cross-role-attempt:
+    environment: staging
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::$ACCOUNT_ID:role/gha-production-lab   # 🚨 시도
+          aws-region: $AWS_REGION
+      - run: echo "이 줄이 보이면 통제 실패"

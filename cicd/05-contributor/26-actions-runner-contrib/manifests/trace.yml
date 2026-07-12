@@ -1,0 +1,16 @@
+# Source: cicd/05-contributor/26-actions-runner-contrib/lab-01-build-and-trace.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: trace
+on: [workflow_dispatch]
+permissions: { contents: read }
+jobs:
+  probe:
+    runs-on: self-hosted          # ← 내가 빌드한 러너가 잡습니다
+    steps:
+      - uses: actions/checkout@v4
+      - name: run 스텝 (ScriptHandler의 손님)
+        run: echo "hello from my own runner build"
+      - name: 표현식 치환 관찰
+        run: echo "event=${{ github.event_name }}"

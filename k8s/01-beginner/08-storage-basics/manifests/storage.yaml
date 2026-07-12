@@ -1,0 +1,50 @@
+# gp3 StorageClass (EBS CSI 애드온 설치 후 사용 가능)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 1Gi
+---
+# PVC를 쓰는 단일 Pod 앱 (데이터 생존 실험용)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keeper
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate        # RWO 볼륨은 롤링(신구 동시 실행) 불가 → Recreate가 정석
+  selector:
+    matchLabels: { app: keeper }
+  template:
+    metadata:
+      labels: { app: keeper }
+    spec:
+      volumes:
+      - name: data
+        persistentVolumeClaim: { claimName: data }
+      containers:
+      - name: app
+        image: public.ecr.aws/docker/library/busybox:stable
+        command: ["sh", "-c", "while true; do sleep 3600; done"]
+        volumeMounts:
+        - { name: data, mountPath: /data }
+        resources:
+          requests: { cpu: 10m, memory: 16Mi }

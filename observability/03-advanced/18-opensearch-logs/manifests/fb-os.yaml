@@ -1,0 +1,25 @@
+# Source: observability/03-advanced/18-opensearch-logs/lab-01-index-and-pipeline.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+config:
+  inputs: |
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/payment*.log
+        Tag               kube.*
+        multiline.parser  cri
+        DB                /var/log/flb_os.db
+  filters: |
+    [FILTER]
+        Name              kubernetes
+        Match             kube.*
+        Merge_Log         On
+        Keep_Log          Off
+  outputs: |
+    [OUTPUT]
+        Name              opensearch
+        Match             kube.*
+        Host              opensearch.logging.svc.cluster.local
+        Port              9200
+        Index             logs-app-2026.07.11
+        Suppress_Type_Name On
+        Trace_Error       On

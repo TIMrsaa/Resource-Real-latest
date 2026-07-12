@@ -1,0 +1,28 @@
+# Source: k8s/03-advanced/23-admission-webhooks/lab-01-cel-policies.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: { name: max-replicas }
+spec:
+  paramKind: { apiVersion: v1, kind: ConfigMap }     # 파라미터를 ConfigMap에서
+  matchConstraints:
+    resourceRules:
+    - {apiGroups: ["apps"], apiVersions: ["v1"], operations: ["CREATE","UPDATE"], resources: ["deployments"]}
+  validations:
+  - expression: "object.spec.replicas <= int(params.data.maxReplicas)"
+    messageExpression: "'replicas는 최대 ' + params.data.maxReplicas + '까지 (cost guard)'"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: replica-limit, namespace: vap-lab }
+data: { maxReplicas: "5" }
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata: { name: max-replicas-binding }
+spec:
+  policyName: max-replicas
+  paramRef: { name: replica-limit, namespace: vap-lab, parameterNotFoundAction: Deny }
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector: { matchLabels: { policy: enforced } }

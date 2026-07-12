@@ -1,0 +1,114 @@
+# =============================================================================
+# nodepool-tiered.yaml — Spot 우선 + On-Demand fallback 2계층 NodePool
+# =============================================================================
+# 패턴:
+#   "평소엔 Spot으로 비용 절감, Spot 부족 시 On-Demand로 자동 fallback"
+#
+# Karpenter 동작:
+#   Pod이 Pending → 모든 NodePool 검토 → weight 높은 것 우선 선택
+#   weight: 100 (spot)  →  weight: 10 (ondemand)
+#   Spot 풀에서 노드 못 만들면 (capacity 부족 등) → ondemand 풀 시도
+#
+# Spot 회수 시나리오:
+#   AWS가 Spot 회수 시그널 (2분 전 통보) 보냄
+#   → Karpenter가 신호 받고 새 노드(스폿 or 온디맨드) 미리 띄우고 마이그레이션
+#   → 사용자 트래픽 무중단
+#
+# 적용:  kubectl apply -f nodepool-tiered.yaml
+#       (기존 default NodePool 삭제하거나 weight 낮춰야 함)
+# =============================================================================
+
+# ── Spot NodePool (우선 선택) ────────────────────────────────────
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: spot
+spec:
+  weight: 100                      # 가중치 100 = 1순위
+  template:
+    metadata:
+      labels:
+        managed-by: karpenter
+        nodepool: spot
+        capacity-type: spot        # Pod이 spot/on-demand 구분 nodeSelector할 때 사용
+    spec:
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: [amd64]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: [spot]           # Spot만 가능
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: [c5, c5a, c6a, c6i, m5, m5a, m6a, m6i, t3, t3a]
+                                   # 다양한 family → Spot 가용성 ↑ (회수 위험 ↓)
+                                   # AMD/Intel 섞기 = 가격/가용성 분산
+        - key: karpenter.k8s.aws/instance-cpu
+          operator: In
+          values: ["2", "4", "8"]
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["2"]
+        - key: topology.kubernetes.io/zone   # AZ 분산
+          operator: In
+          values: [ap-northeast-2a, ap-northeast-2b, ap-northeast-2c]
+                                   # 3개 AZ 모두 사용 = HA + Spot 가용성
+
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+      expireAfter: 168h            # 7일
+
+  limits:
+    cpu: "100"
+
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 30s
+    budgets:                       # 한번에 너무 많이 disruption 못 하게 제한
+      - nodes: "20%"               # 전체 노드의 20% 만 동시에 disruption
+                                   # = 안전한 점진적 교체
+
+---
+# ── On-Demand NodePool (fallback) ────────────────────────────────
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: ondemand
+spec:
+  weight: 10                       # 가중치 10 = Spot 다음 순위
+  template:
+    metadata:
+      labels:
+        managed-by: karpenter
+        nodepool: ondemand
+        capacity-type: on-demand
+    spec:
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: [amd64]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: [on-demand]      # OD만
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: [c5, c6i, m5, m6i, t3]   # OD는 안정적 family로 압축
+        - key: karpenter.k8s.aws/instance-cpu
+          operator: In
+          values: ["2", "4"]                # 비용 절감 위해 작은 것 위주
+
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+      expireAfter: 720h            # 30일 (OD는 더 오래 쓰는 게 효율적)
+
+  limits:
+    cpu: "20"                      # OD는 한도 더 작게 (비용 안전장치)
+
+  disruption:
+    consolidationPolicy: WhenEmpty   # OD는 빈 노드만 정리 (저활용은 안 건드림)
+    consolidateAfter: 5m            # 5분간 비어있으면 종료 (느슨하게)

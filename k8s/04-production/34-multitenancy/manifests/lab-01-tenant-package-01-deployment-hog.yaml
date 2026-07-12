@@ -1,0 +1,20 @@
+# Source: k8s/04-production/34-multitenancy/lab-01-tenant-package.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hog
+  namespace: team-rocket
+  labels: { app: hog }
+spec:
+  replicas: 35                     # ← quota(pods:30)를 초과하는 요구
+  selector:
+    matchLabels: { app: hog }
+  template:
+    metadata:
+      labels: { app: hog }
+    spec:
+      containers:
+        - name: hog
+          image: public.ecr.aws/docker/library/busybox:stable
+          command: ["sleep", "600"]

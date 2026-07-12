@@ -1,0 +1,55 @@
+# Source: cicd/02-intermediate/06-gha-advanced/lab-02-environments.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.fake.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: fake
+        name: 빌드 (04에서 진짜 이미지를 만들었습니다)
+        run: echo "digest=sha256:$(echo -n $GITHUB_SHA | sha256sum | cut -c1-64)" >> "$GITHUB_OUTPUT"
+
+      - name: PR CI 컨텍스트에는 프로덕션 시크릿이 없습니다
+        run: |
+          if [ -z "${{ secrets.DEPLOY_TOKEN }}" ]; then
+            echo "✅ 이 잡(환경 없음)에는 DEPLOY_TOKEN이 없다"
+          else
+            echo "🚨 노출됨"
+          fi
+
+  staging:
+    needs: build
+    environment:
+      name: staging
+      url: https://staging.example.com
+    runs-on: ubuntu-latest
+    steps:
+      - name: 스테이징 배포 (승인 없이 자동)
+        run: |
+          echo "배포: ${{ needs.build.outputs.digest }}"
+          echo "토큰 앞 7자: $(echo '${{ secrets.DEPLOY_TOKEN }}' | cut -c1-7)"   # staging-...
+
+  production:
+    needs: staging                 # ★ 스테이징을 지나야 프로덕션 (승격)
+    environment:
+      name: production
+      url: https://app.example.com
+    runs-on: ubuntu-latest
+    steps:
+      - name: 프로덕션 배포 (승인 후에만 실행됨)
+        run: |
+          echo "같은 아티팩트를 승격: ${{ needs.build.outputs.digest }}"
+          echo "토큰 앞 10자: $(echo '${{ secrets.DEPLOY_TOKEN }}' | cut -c1-10)"  # PRODUCTION-...

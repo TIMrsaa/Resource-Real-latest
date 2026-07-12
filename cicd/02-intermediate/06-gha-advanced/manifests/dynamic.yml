@@ -1,0 +1,47 @@
+# Source: cicd/02-intermediate/06-gha-advanced/lab-02-environments.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: dynamic-matrix
+on: [push, workflow_dispatch]
+permissions: { contents: read }
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.d.outputs.services }}
+      count: ${{ steps.d.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - id: d
+        name: 변경된 서비스만 골라냅니다
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | grep '^services/' | cut -d/ -f2 | sort -u || true)
+          [ -z "$CHANGED" ] && CHANGED=$(ls services)     # 첫 커밋 등: 전부
+          JSON=$(echo "$CHANGED" | jq -R -s -c 'split("\n") | map(select(length>0))')
+          echo "services=$JSON" >> "$GITHUB_OUTPUT"
+          echo "count=$(echo "$JSON" | jq 'length')" >> "$GITHUB_OUTPUT"
+          echo "빌드 대상: $JSON"
+
+  build:
+    needs: discover
+    if: needs.discover.outputs.count != '0'      # ★ 빈 매트릭스 방어 (theory §4)
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.discover.outputs.services) }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "building ${{ matrix.service }}"
+
+  ci:
+    if: always()
+    needs: [discover, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 빌드가 skip이어도 게이트는 통과 (변경 없음)
+        run: |
+          R="${{ needs.build.result }}"
+          [ "$R" = "success" ] || [ "$R" = "skipped" ]

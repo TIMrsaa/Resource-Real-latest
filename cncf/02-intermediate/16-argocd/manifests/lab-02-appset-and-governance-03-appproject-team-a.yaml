@@ -1,0 +1,15 @@
+# Source: cncf/02-intermediate/16-argocd/lab-02-appset-and-governance.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata: { name: team-a, namespace: argocd }
+spec:
+  description: "Team A only"
+  sourceRepos:
+    - "https://github.com/argoproj/argocd-example-apps.git"   # 이 저장소만
+  destinations:
+    - { server: "https://kubernetes.default.svc", namespace: "team-a-*" }  # 이 네임스페이스만
+  clusterResourceWhitelist: []                    # 클러스터 스코프 리소스 생성 금지
+  namespaceResourceBlacklist:
+    - { group: "", kind: "ResourceQuota" }
+    - { group: "", kind: "LimitRange" }

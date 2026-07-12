@@ -1,0 +1,23 @@
+# Source: k8s/02-intermediate/12-scheduling/lab-02-spread-priority.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: spread-demo }
+spec:
+  replicas: 4
+  selector: { matchLabels: { app: spread-demo } }
+  template:
+    metadata: { labels: { app: spread-demo } }
+    spec:
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector: { matchLabels: { app: spread-demo } }
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname        # 노드 단위로도 분산
+        whenUnsatisfiable: ScheduleAnyway          # soft
+        labelSelector: { matchLabels: { app: spread-demo } }
+      containers:
+      - { name: c, image: public.ecr.aws/docker/library/busybox:stable, command: [sleep, "3600"],
+          resources: { requests: { cpu: 10m } } }

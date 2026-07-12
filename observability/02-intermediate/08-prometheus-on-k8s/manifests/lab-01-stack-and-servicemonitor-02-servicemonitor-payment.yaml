@@ -1,0 +1,16 @@
+# Source: observability/02-intermediate/08-prometheus-on-k8s/lab-01-stack-and-servicemonitor.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: payment
+  namespace: shop
+  labels:
+    release: monitoring       # ① Prometheus의 serviceMonitorSelector와 일치
+spec:
+  selector:
+    matchLabels:
+      app: payment            # ② Service의 라벨과 일치
+  endpoints:
+    - port: metrics           # ③ Service 포트 "이름"과 일치
+      interval: 15s

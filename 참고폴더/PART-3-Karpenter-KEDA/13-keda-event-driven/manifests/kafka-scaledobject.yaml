@@ -1,0 +1,53 @@
+# =============================================================================
+# kafka-scaledobject.yaml — Kafka Consumer Lag 기반 KEDA 스케일링
+# =============================================================================
+# Consumer Lag 이란?
+#   Kafka 토픽에 쌓인 메시지 중 컨슈머 그룹이 아직 처리 못 한 메시지 수.
+#   lag = (latest offset) - (consumer's committed offset)
+#
+#   producer ─→ [partition 0] [offset 100] ↓
+#                 consumer commit  [offset 90]
+#                                  → lag = 10
+#
+# 시나리오:
+#   notification-service가 Kafka에서 메시지 처리
+#   producer가 폭주 → lag ↑ → KEDA가 Pod 늘림
+#
+# 중요 제약: Pod 수 ≤ partition 수
+#   Kafka 컨슈머 그룹은 partition당 1개의 컨슈머만 받음
+#   topic partitions=3 이면 maxReplicaCount=3 이상은 무의미
+#   (4번째 Pod 떠도 메시지 안 받음)
+#
+# 전제: Strimzi Kafka 클러스터 설치됨 (strimzi-kafka.yaml)
+# =============================================================================
+
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: notification-service
+  namespace: order
+spec:
+  scaleTargetRef:
+    name: notification-service
+  minReplicaCount: 0               # lag 없으면 0개로 (scale-to-zero)
+  maxReplicaCount: 3               # ★ partition 수(3) 이하로 제한
+                                   # strimzi-kafka.yaml 의 partitions: 3 과 일치
+  pollingInterval: 15
+  cooldownPeriod: 60
+  triggers:
+    - type: kafka
+      metadata:
+        # Kafka 부트스트랩 서버 (Strimzi가 만든 Service DNS)
+        # 형식: <cluster-name>-kafka-bootstrap.<namespace>:9092
+        bootstrapServers: my-cluster-kafka-bootstrap.kafka:9092
+
+        consumerGroup: notification-service   # 어떤 컨슈머 그룹의 lag을 볼지
+                                              # (앱 코드에서 같은 이름 사용해야)
+        topic: notifications                  # 어떤 토픽?
+
+        lagThreshold: "10"         # 메시지 10개당 Pod 1개
+                                   # lag=30 → Pod 3개 (max 도달)
+
+        offsetResetPolicy: latest  # 새 컨슈머가 시작할 때 offset 위치
+                                   # latest   : 가장 최근부터 (과거 메시지 무시)
+                                   # earliest : 토픽 시작부터 (전부 다시 처리)

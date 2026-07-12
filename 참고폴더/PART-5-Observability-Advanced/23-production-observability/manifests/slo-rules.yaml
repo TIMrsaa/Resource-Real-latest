@@ -1,0 +1,97 @@
+# =============================================================================
+# slo-rules.yaml — SLO 기반 Multi-Burn-Rate 알람 (Google SRE 패턴)
+# =============================================================================
+# SLO/SLI/SLA 정의:
+#   SLI (Service Level Indicator) = 측정 지표 (가용성 = 성공/전체 비율)
+#   SLO (Service Level Objective) = 그 SLI의 목표 (99.9%)
+#   SLA (Service Level Agreement) = 외부 약속 (위반 시 보상, 보통 SLO보다 느슨)
+#
+# Error Budget 개념:
+#   SLO 99.9% = 0.1% 실패 허용 = 한 달(30d) 기준 약 43분 다운 가능
+#   = 이 43분이 "에러 예산". 다 쓰면 신규 배포 동결 등의 정책 발동
+#
+# Multi-Burn-Rate Alert (Google SRE Workbook):
+#   "지금 속도로 가면 며칠 안에 한 달 budget을 다 쓸지" 평가
+#   • Fast burn  : 1시간 안에 budget 2% 소진 → 즉시 호출
+#   • Slow burn  : 6시간 안에 budget 5% 소진 → 다음날 대응
+#   여러 시간대 조합으로 false positive 줄임
+#
+# 적용:  kubectl apply -f slo-rules.yaml
+# =============================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: order-service-slo
+  namespace: monitoring
+  labels:
+    release: kps
+
+spec:
+  groups:
+    # ── Recording Rules: SLI 시계열 미리 계산 ──
+    - name: order-service.slo.recording
+      interval: 30s
+      rules:
+        # 5분 윈도우 가용성 SLI (Fast burn 평가용)
+        - record: sli:order_service_availability:ratio_5m
+          expr: |
+            sum(rate(http_requests_total{service="order-service",code!~"5.."}[5m]))
+              /
+            sum(rate(http_requests_total{service="order-service"}[5m]))
+          # 분자: 성공 요청 (code != 5xx)
+          # 분모: 전체 요청
+          # = 성공률 (0~1)
+
+        # 1시간 윈도우
+        - record: sli:order_service_availability:ratio_1h
+          expr: |
+            sum(rate(http_requests_total{service="order-service",code!~"5.."}[1h]))
+              /
+            sum(rate(http_requests_total{service="order-service"}[1h]))
+
+        # 6시간 윈도우 (Slow burn 평가용)
+        - record: sli:order_service_availability:ratio_6h
+          expr: |
+            sum(rate(http_requests_total{service="order-service",code!~"5.."}[6h]))
+              /
+            sum(rate(http_requests_total{service="order-service"}[6h]))
+
+    # ── Alert Rules: Burn Rate 알람 ──
+    - name: order-service.slo.alerts
+      rules:
+        # Fast Burn: 1시간 안에 monthly budget 의 2% 소진
+        # Burn rate = (1 - SLI) / (1 - SLO)
+        # SLO 99.9% (= 0.001 실패 허용), Burn rate 14.4 = 1h 동안 14.4 * (1/720) = 2% 소진
+        # → error rate > 14.4 * 0.001 = 1.44% 이면 fast burn
+        - alert: OrderServiceSLOBurnRateFast
+          expr: |
+            (1 - sli:order_service_availability:ratio_5m) > (14.4 * 0.001)
+            and
+            (1 - sli:order_service_availability:ratio_1h) > (14.4 * 0.001)
+          # 두 윈도우(5m, 1h) 모두 burn rate 초과 시만 발화
+          # → 일시적 spike 무시, 진짜 지속적 문제만 잡음
+          for: 2m                            # 2분 더 지속되면 firing
+          labels:
+            severity: critical               # 즉시 호출 (PagerDuty)
+            slo: availability
+          annotations:
+            summary: "order-service: SLO budget 빠르게 소진 (1h burn 율 {{ $value | humanizePercentage }})"
+            description: "SLO 99.9% 위협 — 즉시 대응 필요"
+            runbook_url: "https://wiki.example.com/runbooks/slo-burn"
+                                             # 대응 매뉴얼 링크 (운영 필수)
+
+        # Slow Burn: 6시간 안에 budget 5% 소진 (느리지만 지속적)
+        - alert: OrderServiceSLOBurnRateSlow
+          expr: |
+            (1 - sli:order_service_availability:ratio_1h) > (1 * 0.001)
+            and
+            (1 - sli:order_service_availability:ratio_6h) > (1 * 0.001)
+          # error rate > 0.1% (= SLO budget 동일 속도) 가 1h, 6h 모두에서
+          for: 15m
+          labels:
+            severity: warning                # warning = 다음 영업일 대응
+            slo: availability
+          annotations:
+            summary: "order-service: SLO budget 느린 소진 ({{ $value | humanizePercentage }})"
+            description: "SLO 99.9% 위협 가능 — 다음 영업일 내 대응"

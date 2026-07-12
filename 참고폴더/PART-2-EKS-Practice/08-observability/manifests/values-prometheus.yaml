@@ -1,0 +1,77 @@
+# =============================================================================
+# values-prometheus.yaml — kube-prometheus-stack Helm 차트 설정값
+# =============================================================================
+# kube-prometheus-stack이 한번에 설치하는 것:
+#   • Prometheus Operator (CRD 관리)
+#   • Prometheus (메트릭 수집/저장)
+#   • Alertmanager (알람 라우팅)
+#   • Grafana (시각화)
+#   • node-exporter (노드 메트릭)
+#   • kube-state-metrics (K8s 객체 메트릭)
+#
+# 설치:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm install kps prometheus-community/kube-prometheus-stack \
+#     -n monitoring --create-namespace -f values-prometheus.yaml
+#
+# 접근:
+#   Grafana:    kubectl port-forward -n monitoring svc/kps-grafana 3000:80
+#               → http://localhost:3000 (admin / 아래 password)
+#   Prometheus: kubectl port-forward -n monitoring svc/kps-kube-prometheus-stack-prometheus 9090
+# =============================================================================
+
+# ── Prometheus 본체 설정 ──────────────────────────────────────────
+prometheus:
+  prometheusSpec:
+    retention: 1d                # 메트릭 보관 기간 (학습용 짧게)
+                                 # 운영: 15d~30d (디스크 비용과 trade-off)
+                                 # 장기 보관 필요시 Thanos/AMP 별도 (Part-5-23)
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3   # PV 스토리지 클래스 (storageclass-gp3.yaml)
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 10Gi       # 메트릭 저장 디스크. 1d 학습엔 충분
+                                  # 카디널리티 폭발 시 빠르게 참
+    resources:
+      requests:                   # 자원 요청 (스케줄러용)
+        cpu: 100m
+        memory: 512Mi
+      limits:                     # 자원 한도 (OOM 방지)
+        cpu: 1                    # 1 vCPU
+        memory: 2Gi               # 메트릭 폭증 시 더 늘려야 할 수도
+
+# ── Grafana ───────────────────────────────────────────────────────
+grafana:
+  adminUser: admin                # 로그인 ID
+  adminPassword: eks-study-admin  # ⚠ 학습용. 운영은 Secret으로 분리!
+  service:
+    type: ClusterIP               # 외부 노출 안 함. port-forward로 접근
+                                  # 운영: LoadBalancer 또는 Ingress + ALB + OAuth
+  persistence:
+    enabled: true                 # 대시보드 등 설정 유지하려면 PV 필수
+    storageClassName: gp3
+    size: 5Gi
+  defaultDashboardsTimezone: Asia/Seoul   # 대시보드 시간대 (한국)
+
+# ── Alertmanager ──────────────────────────────────────────────────
+alertmanager:
+  alertmanagerSpec:
+    storage:                      # Alert 상태 영속화 (재시작 시 중복 발송 방지)
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 1Gi
+
+# kube-state-metrics 와 node-exporter 는 기본 활성 (별도 설정 불필요)
+
+# ── 기본 K8s 알람 자동 생성 ───────────────────────────────────────
+defaultRules:
+  create: true                    # K8s 표준 alert rule 모음 자동 생성
+                                  # (KubePodCrashLooping, KubeNodeNotReady 등)
+                                  # 직접 만들 필요 없는 기본 알람들

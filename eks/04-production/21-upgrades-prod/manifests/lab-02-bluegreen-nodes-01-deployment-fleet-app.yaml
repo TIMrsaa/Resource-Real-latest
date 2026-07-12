@@ -1,0 +1,19 @@
+# Source: eks/04-production/21-upgrades-prod/lab-02-bluegreen-nodes.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-app
+  labels: { app: fleet-app }
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: fleet-app }
+  template:
+    metadata:
+      labels: { app: fleet-app }
+    spec:
+      nodeSelector: { fleet: blue }      # 현역(blue) 함대에만 배치
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.1

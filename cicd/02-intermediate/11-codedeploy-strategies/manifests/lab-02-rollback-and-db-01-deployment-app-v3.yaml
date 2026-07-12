@@ -1,0 +1,16 @@
+# Source: cicd/02-intermediate/11-codedeploy-strategies/lab-02-rollback-and-db.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: app-v3, namespace: deploylab }
+spec:
+  replicas: 0
+  selector: { matchLabels: { app: myapp, version: v3 } }
+  template:
+    metadata: { labels: { app: myapp, version: v3 } }
+    spec:
+      containers:
+      - name: app
+        image: ghcr.io/stefanprodan/podinfo:6.7.1
+        command: ["./podinfo", "--port=9898", "--random-error=true"]
+        ports: [{ containerPort: 9898 }]

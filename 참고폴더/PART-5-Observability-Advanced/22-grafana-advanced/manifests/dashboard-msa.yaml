@@ -1,0 +1,111 @@
+# =============================================================================
+# dashboard-msa.yaml — Grafana 대시보드 (RED 메트릭) 자동 import용 ConfigMap
+# =============================================================================
+# 동작 원리:
+#   kube-prometheus-stack은 Grafana 옆에 sidecar 컨테이너를 띄움
+#   sidecar가 'grafana_dashboard=1' 라벨이 붙은 ConfigMap을 감시
+#   → ConfigMap의 JSON을 자동으로 Grafana에 import
+#   = "ConfigMap만 만들면 대시보드가 뜬다"
+#
+# 대시보드 JSON 구조:
+#   • title/uid     : 대시보드 식별
+#   • templating    : 변수 ($namespace, $service)
+#   • panels        : 그래프/통계 패널들
+#     - targets     : PromQL 쿼리
+#     - gridPos     : 위치 (x, y, 너비 w, 높이 h)
+#
+# 변수 사용:
+#   $namespace = 사용자가 드롭다운에서 고른 namespace
+#   $service = 여러 개 선택 가능 (multi: true)
+#   쿼리에서 namespace="$namespace" 처럼 사용
+#
+# 적용:  kubectl apply -f dashboard-msa.yaml
+# 확인:  Grafana → Dashboards → "MSA RED Dashboard"
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-msa-red
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"               # ← 핵심! sidecar 가 이 라벨 monitor
+
+data:
+  # 키 이름 (msa-red.json) 은 무관. 값이 JSON 이어야 함
+  # | (multiline) 로 JSON을 들여쓰기 보존하며 작성
+  msa-red.json: |
+    {
+      "title": "MSA RED Dashboard",
+      "uid": "msa-red",
+      "tags": ["eks-study", "msa"],
+      "schemaVersion": 39,
+      "version": 1,
+      "time": {"from": "now-1h", "to": "now"},
+      "refresh": "30s",
+
+      "templating": {
+        "list": [
+          {
+            "name": "namespace",
+            "type": "query",
+            "datasource": "Prometheus",
+            "query": "label_values(http_requests_total, namespace)",
+            "current": {"text": "order", "value": "order"}
+          },
+          {
+            "name": "service",
+            "type": "query",
+            "datasource": "Prometheus",
+            "query": "label_values(http_requests_total{namespace=\"$namespace\"}, service)",
+            "multi": true,
+            "includeAll": true
+          }
+        ]
+      },
+
+      "panels": [
+        {
+          "id": 1,
+          "title": "RPS by service",
+          "type": "timeseries",
+          "gridPos": {"x":0,"y":0,"w":12,"h":8},
+          "targets": [{
+            "expr": "sum by (service) (rate(http_requests_total{namespace=\"$namespace\",service=~\"$service\"}[1m]))",
+            "legendFormat": "{{service}}"
+          }]
+        },
+        {
+          "id": 2,
+          "title": "Error rate by service (%)",
+          "type": "timeseries",
+          "gridPos": {"x":12,"y":0,"w":12,"h":8},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [{
+            "expr": "sum by (service) (rate(http_requests_total{namespace=\"$namespace\",service=~\"$service\",code=~\"5..\"}[1m])) / sum by (service) (rate(http_requests_total{namespace=\"$namespace\",service=~\"$service\"}[1m]))",
+            "legendFormat": "{{service}}"
+          }]
+        },
+        {
+          "id": 3,
+          "title": "p99 latency by service",
+          "type": "timeseries",
+          "gridPos": {"x":0,"y":8,"w":12,"h":8},
+          "fieldConfig": {"defaults": {"unit": "s"}},
+          "targets": [{
+            "expr": "histogram_quantile(0.99, sum by (le, service) (rate(http_request_duration_seconds_bucket{namespace=\"$namespace\",service=~\"$service\"}[5m])))",
+            "legendFormat": "{{service}}"
+          }]
+        },
+        {
+          "id": 4,
+          "title": "In-flight requests",
+          "type": "stat",
+          "gridPos": {"x":12,"y":8,"w":12,"h":8},
+          "targets": [{
+            "expr": "sum by (service) (http_requests_in_flight{namespace=\"$namespace\",service=~\"$service\"})",
+            "legendFormat": "{{service}}"
+          }]
+        }
+      ]
+    }

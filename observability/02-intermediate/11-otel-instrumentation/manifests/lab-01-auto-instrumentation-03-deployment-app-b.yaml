@@ -1,0 +1,39 @@
+# Source: observability/02-intermediate/11-otel-instrumentation/lab-01-auto-instrumentation.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: app-b-code, namespace: shop }
+data:
+  app.py: |
+    from flask import Flask
+    import time
+    app = Flask(__name__)
+    @app.route("/stock")
+    def stock():
+        time.sleep(0.15)          # 재고 조회 흉내
+        return {"stock": 42}
+    app.run(host="0.0.0.0", port=8080)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: app-b, namespace: shop }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: app-b } }
+  template:
+    metadata:
+      labels: { app: app-b }
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "true"   # ★ 이 한 줄!
+    spec:
+      containers:
+        - name: app
+          image: python:3.12-slim
+          command: ["sh","-c","pip install flask requests -q && python /code/app.py"]
+          volumeMounts: [{ name: code, mountPath: /code }]
+      volumes: [{ name: code, configMap: { name: app-b-code } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: app-b, namespace: shop }
+spec: { selector: { app: app-b }, ports: [{ port: 8080 }] }

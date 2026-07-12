@@ -1,0 +1,99 @@
+# =============================================================================
+# alertmanager-config.yaml — Alertmanager 라우팅 설정 (어디로 알람 보낼지)
+# =============================================================================
+# Prometheus가 알람을 발화하면 → Alertmanager로 보냄 → 라우팅 → 외부 채널
+#
+# Alertmanager 역할:
+#   1) 그룹화 (groupBy) : 비슷한 알람 묶어서 한 번만 발송
+#   2) 침묵 (silences) : 점검 중인 시간대 알람 끄기
+#   3) 억제 (inhibit)  : critical 발화 시 같은 대상 warning 억제
+#   4) 라우팅 (route)  : 라벨 기반으로 다른 채널로 분기
+#
+# Receiver 종류:
+#   • webhook    : 임의 HTTP 엔드포인트
+#   • slack      : Slack 채널
+#   • pagerduty  : PagerDuty 호출
+#   • email      : SMTP
+#   • opsgenie, victorops, msteams 등 다수
+#
+# 적용 전제:
+#   AlertmanagerConfig CRD는 v1alpha1. kube-prometheus-stack 설치 시 활성화
+#   alertmanagerConfig 라벨이 Alertmanager의 selector와 매칭돼야 적용됨
+# =============================================================================
+
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: eks-study-routing
+  namespace: monitoring
+  labels:
+    alertmanagerConfig: kps                  # ← Alertmanager spec의 selector와 매칭
+
+spec:
+  # ── 라우팅 트리 (top-down 매칭) ──
+  route:
+    # 그룹화: 같은 그룹 알람은 묶어서 한 번에 보냄
+    groupBy: [alertname, namespace, service]
+    groupWait: 30s                           # 첫 알람 후 30초 대기 (같은 그룹 모으려)
+    groupInterval: 5m                        # 같은 그룹 새 알람 → 5분 간격으로 발송
+    repeatInterval: 4h                       # 해결 안 됨 → 4시간마다 재발송
+
+    receiver: default-webhook                # 매칭 안 된 알람의 기본 수신자
+
+    routes:                                  # 우선순위 순으로 매칭 (위가 먼저)
+      # 1. critical 알람은 PagerDuty로
+      - matchers:
+          - {name: severity, value: critical}
+        receiver: pagerduty-critical
+        continue: true                       # ★ true: 매칭 후에도 다음 라우트 평가
+                                             # = 기본 receiver도 동시에 받음 (이중 알림)
+
+      # 2. team=platform 라벨은 Slack #platform-alerts
+      - matchers:
+          - {name: team, value: platform}
+        receiver: platform-slack
+
+      # 3. Watchdog 알람은 무시 (Prometheus 작동 확인용 더미)
+      - matchers:
+          - {name: alertname, value: Watchdog}
+        receiver: blackhole
+
+  # ── 억제 규칙 (중복 알람 방지) ──
+  # critical 발화 시 같은 namespace/service 의 warning 자동 침묵
+  inhibitRules:
+    - sourceMatch:
+        - {name: severity, value: critical}
+      targetMatch:
+        - {name: severity, value: warning}
+      equal: [namespace, service]            # 두 라벨이 같으면 억제
+
+  # ── Receivers (실제 발송 대상) ──
+  receivers:
+    # 기본: 웹훅 (테스트용 webhook.site 등)
+    - name: default-webhook
+      webhookConfigs:
+        - url: https://webhook.site/<your-test-id>
+          sendResolved: true                 # 알람 해소 시 "resolved" 메시지도 발송
+
+    # PagerDuty (즉시 호출)
+    - name: pagerduty-critical
+      pagerdutyConfigs:
+        - routingKey:
+            name: pagerduty-key              # Secret 이름
+            key: integrationKey              # Secret 안의 키
+                                             # = Secret/pagerduty-key.data.integrationKey 참조
+          severity: critical
+          sendResolved: true
+
+    # Slack
+    - name: platform-slack
+      slackConfigs:
+        - apiURL:
+            name: slack-webhook              # Slack incoming webhook URL을 담은 Secret
+            key: url
+          channel: '#platform-alerts'
+          sendResolved: true
+
+    # 무시용 (Watchdog 같은 노이즈 차단)
+    - name: blackhole
+      # 비어있음 = 어디로도 안 보냄 (= 침묵)

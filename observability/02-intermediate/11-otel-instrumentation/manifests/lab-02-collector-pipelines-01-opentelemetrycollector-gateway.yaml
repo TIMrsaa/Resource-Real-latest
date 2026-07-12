@@ -1,0 +1,37 @@
+# Source: observability/02-intermediate/11-otel-instrumentation/lab-02-collector-pipelines.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata: { name: gateway, namespace: observability }
+spec:
+  mode: deployment
+  replicas: 2                                  # 07의 교훈 — 정책층도 HA
+  config:
+    receivers:
+      otlp: { protocols: { grpc: {}, http: {} } }
+    processors:
+      memory_limiter:                          # ★ 자기 보호 첫 번째 (06 사상)
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 20
+      tail_sampling:                           # ★ tail — 전 span이 모이는 곳에서만
+        decision_wait: 10s
+        policies:
+          - name: errors-always
+            type: status_code
+            status_code: { status_codes: [ERROR] }     # 에러 trace 100%
+          - name: slow-always
+            type: latency
+            latency: { threshold_ms: 500 }             # 느린 trace 100%
+          - name: baseline
+            type: probabilistic
+            probabilistic: { sampling_percentage: 10 } # 나머지 10%
+      batch: {}
+    exporters:
+      debug: { verbosity: normal }             # 실전: otlp/tempo·awsxray(16·17)
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, tail_sampling, batch]
+          exporters: [debug]

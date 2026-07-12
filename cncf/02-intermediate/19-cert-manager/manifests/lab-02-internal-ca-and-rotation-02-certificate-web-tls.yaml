@@ -1,0 +1,13 @@
+# Source: cncf/02-intermediate/19-cert-manager/lab-02-internal-ca-and-rotation.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: { name: web-tls, namespace: apps }
+spec:
+  secretName: web-tls
+  issuerRef: { name: internal-ca, kind: ClusterIssuer }
+  commonName: web.apps.svc
+  dnsNames: ["web.apps.svc", "web.apps.svc.cluster.local"]
+  duration: 2h              # 짧게 (회전 실습)
+  renewBefore: 1h50m        # 발급 10분 후 갱신 시도
+  privateKey: { rotationPolicy: Always }

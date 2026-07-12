@@ -1,0 +1,19 @@
+# Source: k8s/02-intermediate/11-auth-rbac/lab-01-rbac-basics.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo
+  namespace: rbac-lab
+  labels: { app: demo }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: demo }
+  template:
+    metadata:
+      labels: { app: demo }
+    spec:
+      containers:
+        - name: demo
+          image: public.ecr.aws/nginx/nginx:1.27

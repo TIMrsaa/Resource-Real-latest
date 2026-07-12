@@ -1,0 +1,18 @@
+# Source: cicd/04-production/24-enterprise-patterns/lab-02-policy-as-code.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+name: policy-check
+on:
+  pull_request:
+    paths: ['.github/workflows/**']    # 파이프라인 정의가 바뀔 때 (독립 영역이라 path filter 안전 — 20)
+permissions: { contents: read }
+jobs:
+  conftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: conftest 설치
+        run: |
+          curl -sL https://github.com/open-policy-agent/conftest/releases/latest/download/conftest_Linux_x86_64.tar.gz \
+            | tar xz conftest && sudo mv conftest /usr/local/bin/
+      - name: 워크플로 정책 검사
+        run: conftest test .github/workflows/*.yml -p policy/

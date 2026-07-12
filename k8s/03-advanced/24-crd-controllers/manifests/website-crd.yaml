@@ -1,0 +1,46 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: websites.platform.example.com
+spec:
+  group: platform.example.com
+  scope: Namespaced
+  names:
+    kind: Website
+    plural: websites
+    singular: website
+    shortNames: [ws]
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required: [image, replicas]
+            properties:
+              image:
+                type: string
+                pattern: '^.+:.+$'          # 태그 필수 (모듈 01/04의 교훈을 스키마로)
+              replicas:
+                type: integer
+                minimum: 1
+                maximum: 10
+              domain:
+                type: string
+          status:
+            type: object
+            properties:
+              readyReplicas: { type: integer }
+              phase: { type: string }
+    subresources:
+      status: {}                             # spec/status 채널 분리
+      scale:                                 # kubectl scale + HPA 호환
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.readyReplicas
+    additionalPrinterColumns:
+    - { name: Ready, type: integer, jsonPath: .status.readyReplicas }
+    - { name: Phase, type: string, jsonPath: .status.phase }

@@ -1,0 +1,12 @@
+# Source: cncf/02-intermediate/16-argocd/lab-02-appset-and-governance.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata: { name: bad-app, namespace: argocd }
+spec:
+  project: team-a
+  source:
+    repoURL: https://github.com/argoproj/argocd-example-apps.git
+    targetRevision: HEAD
+    path: guestbook
+  destination: { server: https://kubernetes.default.svc, namespace: kube-system }

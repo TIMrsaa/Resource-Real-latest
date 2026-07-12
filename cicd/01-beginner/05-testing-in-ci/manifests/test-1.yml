@@ -1,0 +1,35 @@
+# Source: cicd/01-beginner/05-testing-in-ci/lab-02-flaky-quarantine.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: test
+on: [push, pull_request]
+permissions: { contents: read, issues: write }
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements-dev.txt
+      - name: 게이트 — 격리된 것 제외, 순서 랜덤
+        run: pytest -q -m "not quarantine" tests/
+
+  quarantined:                       # 격리된 테스트를 계속 관찰 (실패해도 게이트 무관)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q -m quarantine tests/ || echo "격리 테스트 여전히 불안정"
+
+  ci:
+    if: always()
+    needs: [unit]                    # ★ quarantined는 needs에 없다 = 게이트가 아닙니다
+    runs-on: ubuntu-latest
+    steps:
+      - run: '[ "${{ needs.unit.result }}" = "success" ]'

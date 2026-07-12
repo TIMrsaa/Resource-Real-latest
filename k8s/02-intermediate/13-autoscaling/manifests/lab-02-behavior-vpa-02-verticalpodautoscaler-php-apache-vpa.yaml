@@ -1,0 +1,8 @@
+# Source: k8s/02-intermediate/13-autoscaling/lab-02-behavior-vpa.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata: { name: php-apache-vpa }
+spec:
+  targetRef: { apiVersion: apps/v1, kind: Deployment, name: php-apache }
+  updatePolicy: { updateMode: "Off" }       # 권고만!

@@ -1,0 +1,12 @@
+# Source: eks/03-advanced/19-graviton-gpu/lab-02-gpu.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata: { name: cuda-second }
+spec:
+  restartPolicy: OnFailure
+  tolerations: [{ key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }]
+  containers:
+  - name: cuda
+    image: nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0
+    resources: { limits: { nvidia.com/gpu: 1 } }

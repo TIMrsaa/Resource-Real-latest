@@ -1,0 +1,17 @@
+# Source: observability/01-beginner/02-logging-basics/lab-01-log-path-deep-dive.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata: { name: talker }
+spec:
+  containers:
+    - name: app
+      image: busybox
+      command: ["sh","-c"]
+      args:
+        - |
+          echo "normal stdout line";
+          echo "error line" >&2;
+          # 16KB 넘는 긴 줄 (P 플래그 유발)
+          head -c 20000 /dev/zero | tr '\0' 'x'; echo;
+          sleep 3600

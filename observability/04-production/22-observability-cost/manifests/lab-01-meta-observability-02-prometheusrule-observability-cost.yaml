@@ -1,0 +1,23 @@
+# Source: observability/04-production/22-observability-cost/lab-01-meta-observability.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-cost
+  namespace: monitoring
+  labels: { release: monitoring }
+spec:
+  groups:
+    - name: obs.cost
+      interval: 60s
+      rules:
+        # 일일 로그 바이트 추정 (bytes/s × 86400)
+        - record: cost:log_bytes:per_day
+          expr: sum(rate(fluentbit_input_bytes_total[30m])) * 86400
+        # 월 메트릭 샘플 추정 (14의 계산식을 rule로!)
+        - record: cost:metric_samples:per_month
+          expr: sum(rate(prometheus_tsdb_head_samples_appended_total[30m])) * 2592000
+        # 단가를 곱한 추정 비용 (단가는 상수로 — 최신 요금표에서 갱신)
+        - record: cost:log_usd:per_month_estimate
+          expr: (sum(rate(fluentbit_input_bytes_total[30m])) * 86400 * 30 / 1e9) * 0.5
+          # ↑ 예시 단가 $0.5/GB — 자기 계약 단가로 교체

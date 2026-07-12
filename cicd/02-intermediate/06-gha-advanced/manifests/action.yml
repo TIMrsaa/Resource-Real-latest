@@ -1,0 +1,26 @@
+# Source: cicd/02-intermediate/06-gha-advanced/lab-01-reusable.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: Setup Python App
+description: 파이썬 설정 + 의존성 설치 (여러 워크플로에서 반복되는 스텝들)
+inputs:
+  python-version:
+    description: Python 버전
+    default: "3.12"
+  requirements:
+    description: 요구사항 파일
+    default: requirements-dev.txt
+runs:
+  using: composite            # ★ JS도 Docker도 아닌 "스텝 묶음"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+    - name: 의존성 설치
+      shell: bash             # ★ composite에서는 shell 명시 필수
+      run: pip install -r ${{ inputs.requirements }}
+    - name: 버전 확인
+      shell: bash
+      run: python --version

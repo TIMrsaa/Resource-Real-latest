@@ -1,0 +1,35 @@
+# =============================================================================
+# nodeport.yaml — NodePort Service (모든 노드의 특정 포트로 외부 노출)
+# =============================================================================
+# 동작:
+#   외부 클라이언트 → <노드IP>:30080 → NodePort → ClusterIP → Pod 중 1개
+#
+# 어떤 노드의 30080으로 와도 OK (모든 노드의 kube-proxy가 라우팅 처리)
+#
+# 한계 (실무에서 잘 안 쓰는 이유):
+#   • 30000~32767 만 사용 가능 → 80/443 같은 표준 포트 못 씀
+#   • 노드 IP가 변하면 클라이언트도 바꿔야 함
+#   • 보안 그룹 관리 번거로움
+#   → 실무에서는 LoadBalancer Service나 Ingress + ALB 사용
+#
+# 학습용으로는 가장 직관적 (외부에서 바로 IP:포트로 호출 가능)
+#
+# 적용:  kubectl apply -f nodeport.yaml
+#       (앞서 clusterip.yaml의 Deployment "web"이 살아있어야 함)
+# 테스트: kubectl get nodes -o wide   ← 노드 IP 확인
+#         curl http://<노드IP>:30080
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-nodeport
+spec:
+  type: NodePort                # 모든 노드의 nodePort에서 받기
+  selector:
+    app: web                    # clusterip.yaml의 Deployment Pod를 재활용
+  ports:
+    - port: 80                  # ClusterIP에서의 포트 (다른 Pod에서 호출 시)
+      targetPort: 80            # Pod의 실제 포트
+      nodePort: 30080           # 노드의 외부 포트 (30000~32767만 가능)
+                                # 미지정 시 K8s가 임의로 할당

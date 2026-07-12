@@ -1,0 +1,18 @@
+# Source: cncf/03-advanced/32-kyverno/lab-01-four-rule-types.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: require-non-root }
+spec:
+  background: true
+  rules:
+    - name: check-non-root
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      validate:
+        failureAction: Audit            # ★ 07의 audit부터 (규칙 단위 — spec 단위 validationFailureAction은 폐기 예정)
+        message: "containers must set runAsNonRoot: true"
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  runAsNonRoot: true

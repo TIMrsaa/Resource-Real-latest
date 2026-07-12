@@ -1,0 +1,8 @@
+# Source: k8s/04-production/35-upgrades/lab-01-preflight.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: policy/v1beta1        # 1.25에서 제거됨 → policy/v1 (reference 표)
+kind: PodDisruptionBudget
+metadata: { name: legacy-pdb }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: x } }

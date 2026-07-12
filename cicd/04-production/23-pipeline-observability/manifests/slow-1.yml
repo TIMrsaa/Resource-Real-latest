@@ -1,0 +1,19 @@
+# Source: cicd/04-production/23-pipeline-observability/lab-02-optimize-and-flaky.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+name: slow
+on: [workflow_dispatch]
+permissions: { contents: read }
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps: [{ run: sleep 20 }]
+  unit:
+    runs-on: ubuntu-latest          # needs 제거 — 병렬
+    steps: [{ run: sleep 45 }]
+  integration:
+    runs-on: ubuntu-latest          # needs 제거 — 병렬
+    steps: [{ run: sleep 70 }]
+  build:
+    needs: [lint, unit, integration]  # 게이트는 유지 — 그러나 셋을 "동시에" 기다림
+    runs-on: ubuntu-latest
+    steps: [{ run: sleep 30 }]

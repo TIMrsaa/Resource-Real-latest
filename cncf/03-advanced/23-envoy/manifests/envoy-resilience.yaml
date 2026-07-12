@@ -1,0 +1,51 @@
+# Source: cncf/03-advanced/23-envoy/lab-02-resilience-and-observability.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+admin: { address: { socket_address: { address: 0.0.0.0, port_value: 9901 } } }
+static_resources:
+  listeners:
+    - name: main
+      address: { socket_address: { address: 0.0.0.0, port_value: 8080 } }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config: { "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router }
+                route_config:
+                  virtual_hosts:
+                    - name: all
+                      domains: ["*"]
+                      routes:
+                        - match: { prefix: "/" }
+                          route:
+                            cluster: backends
+                            timeout: 2s               # ★ route 타임아웃
+                            retry_policy:              # ★ 재시도
+                              retry_on: "5xx,reset,connect-failure"
+                              num_retries: 2
+                              per_try_timeout: 1s
+  clusters:
+    - name: backends
+      connect_timeout: 1s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      circuit_breakers:                              # ★ 서킷 브레이커
+        thresholds:
+          - priority: DEFAULT
+            max_connections: 10
+            max_pending_requests: 5
+            max_requests: 10
+      outlier_detection:                             # ★ 아웃라이어 감지
+        consecutive_5xx: 3
+        interval: 5s
+        base_ejection_time: 10s
+        max_ejection_percent: 50
+      load_assignment:
+        cluster_name: backends
+        endpoints:
+          - lb_endpoints:
+              - endpoint: { address: { socket_address: { address: backend-a, port_value: 5678 } } }
+              - endpoint: { address: { socket_address: { address: backend-b, port_value: 5678 } } }

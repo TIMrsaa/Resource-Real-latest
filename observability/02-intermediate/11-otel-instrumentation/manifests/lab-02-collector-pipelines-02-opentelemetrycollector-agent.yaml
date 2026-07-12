@@ -1,0 +1,24 @@
+# Source: observability/02-intermediate/11-otel-instrumentation/lab-02-collector-pipelines.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata: { name: agent, namespace: observability }
+spec:
+  mode: daemonset                              # ★ 노드마다 (06의 DS와 같은 이유)
+  config:
+    receivers:
+      otlp: { protocols: { grpc: {}, http: {} } }
+    processors:
+      memory_limiter: { check_interval: 1s, limit_percentage: 70, spike_limit_percentage: 20 }
+      k8sattributes: {}                        # ★ k8s 메타 부착 — 노드 로컬에서 (06 kubernetes 필터 사상)
+      batch: {}
+    exporters:
+      otlp/gateway:
+        endpoint: gateway-collector.observability:4317
+        tls: { insecure: true }
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, batch]
+          exporters: [otlp/gateway]

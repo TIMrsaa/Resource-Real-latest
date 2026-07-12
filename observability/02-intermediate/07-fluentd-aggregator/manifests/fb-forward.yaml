@@ -1,0 +1,31 @@
+# Source: observability/02-intermediate/07-fluentd-aggregator/lab-01-two-tier-pipeline.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+config:
+  service: |
+    [SERVICE]
+        Flush         1
+        HTTP_Server   On
+        HTTP_Port     2020
+        storage.path  /var/log/flb-storage/
+  inputs: |
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*.log
+        Tag               kube.*
+        multiline.parser  cri
+        DB                /var/log/flb_kube.db
+        storage.type      filesystem
+  filters: |
+    [FILTER]
+        Name              kubernetes
+        Match             kube.*
+        Merge_Log         On
+        Keep_Log          Off
+  outputs: |
+    [OUTPUT]
+        Name                    forward
+        Match                   kube.*
+        Host                    fluentd.logging.svc.cluster.local
+        Port                    24224
+        Require_ack_response    True        # ★ ack 신뢰성
+        storage.total_limit_size 200M

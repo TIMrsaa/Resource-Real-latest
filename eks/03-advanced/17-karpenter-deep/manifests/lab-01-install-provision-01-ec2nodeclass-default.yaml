@@ -1,0 +1,31 @@
+# Source: eks/03-advanced/17-karpenter-deep/lab-01-install-provision.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata: { name: default }
+spec:
+  amiSelectorTerms: [{ alias: al2023@latest }]
+  role: KarpenterNodeRole-$CLUSTER
+  subnetSelectorTerms: [{ tags: { karpenter.sh/discovery: $CLUSTER } }]
+  securityGroupSelectorTerms: [{ tags: { karpenter.sh/discovery: $CLUSTER } }]
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata: { name: lab }
+spec:
+  template:
+    spec:
+      requirements:                       # 네거티브 설계 — 배제만 (theory §3)
+      - { key: karpenter.k8s.aws/instance-category, operator: In, values: [c, m, r] }
+      - { key: karpenter.k8s.aws/instance-generation, operator: Gt, values: ["4"] }
+      - { key: kubernetes.io/arch, operator: In, values: [amd64] }
+      - { key: karpenter.sh/capacity-type, operator: In, values: [on-demand] }
+      taints: [{ key: lab, value: karpenter, effect: NoSchedule }]   # 실험 격리
+      nodeClassRef: { group: karpenter.k8s.aws, kind: EC2NodeClass, name: default }
+      expireAfter: 720h
+  limits: { cpu: "8" }                    # ★ 안전핀 — 이 랩의 청구서 상한
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 1m

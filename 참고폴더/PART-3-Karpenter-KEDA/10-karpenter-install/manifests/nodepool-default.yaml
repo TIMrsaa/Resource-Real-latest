@@ -1,0 +1,113 @@
+# =============================================================================
+# nodepool-default.yaml — Karpenter NodePool + EC2NodeClass (기본 셋업)
+# =============================================================================
+# Karpenter란?
+#   "Pending Pod이 생기면 가장 효율적인 EC2를 즉시 띄워주는" 노드 오토스케일러.
+#   기존 Cluster Autoscaler(CA)와의 차이:
+#     • CA: ASG 단위로 미리 정의한 인스턴스 타입만 띄움 (한정적)
+#     • Karpenter: Pod 요구사항을 보고 600+개 인스턴스 타입 중 최적 선택
+#                   ASG 우회, 직접 EC2 API 호출 → 약 30~60초 만에 노드 준비
+#
+# 두 CRD 의 역할 분담:
+#   NodePool      = "어떤 노드를 만들 수 있는가?" (제약 조건/한도)
+#   EC2NodeClass  = "AWS 측 설정" (AMI, 서브넷, 보안그룹, 디스크)
+#
+# 적용 전제:
+#   1) Karpenter Helm 설치 완료
+#   2) 노드 IAM Role 'KarpenterNodeRole-eks-study' 생성됨
+#   3) VPC 서브넷/SG에 'karpenter.sh/discovery=eks-study' 태그 부착
+#
+# 적용:  kubectl apply -f nodepool-default.yaml
+# 확인:  kubectl get nodepool,ec2nodeclass
+# 시연:  kubectl apply -f inflate-deployment.yaml
+#       kubectl scale deploy inflate --replicas=5
+#       → 노드가 자동으로 추가됨 (kubectl get nodes -w)
+# =============================================================================
+
+# ── NodePool: "어떤 노드를 만들 수 있나" 제약 명세 ──────────────
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: default
+spec:
+  template:
+    metadata:
+      labels:
+        managed-by: karpenter      # 이 노드가 Karpenter 소유임을 표시
+        nodepool: default          # nodeSelector로 Pod이 이 풀의 노드 고르기
+    spec:
+      requirements:                # 어떤 노드를 띄울 수 있는지 제약 (모두 AND)
+        - key: kubernetes.io/arch
+          operator: In
+          values: [amd64]          # x86. arm64 (Graviton) 도 가능 (저렴/효율적)
+        - key: kubernetes.io/os
+          operator: In
+          values: [linux]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: [spot]           # Spot만 사용 (비용 절감, 학습용)
+                                   # [spot, on-demand] 면 Spot 우선 + OD fallback
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: [c, m, r, t]     # c=컴퓨트, m=범용, r=메모리, t=버스터블
+        - key: karpenter.k8s.aws/instance-cpu
+          operator: In
+          values: ["2", "4", "8"]  # 2/4/8 vCPU 만 (학습 비용 제한)
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt             # Greater Than
+          values: ["2"]            # 3세대 이상 (c5/m5/t3 등)
+
+      nodeClassRef:                # 어떤 EC2NodeClass(AWS 설정)를 쓸지
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+
+      expireAfter: 168h            # 7일 (168시간) 후 노드 자동 교체
+                                   # 보안 패치 적용 + AMI 최신화 강제
+
+  limits:                          # NodePool 전체 자원 한도 (안전장치)
+    cpu: "100"                     # 100 vCPU 이상 못 만듦 (비용 폭주 방지)
+    memory: 200Gi
+
+  disruption:                      # 노드 정리(disruption) 정책
+    consolidationPolicy: WhenEmptyOrUnderutilized
+                                   # 옵션:
+                                   # • WhenEmpty            : Pod 0개 노드만 정리
+                                   # • WhenEmptyOrUnderutilized : 저활용 노드도 통합
+    consolidateAfter: 30s          # 저활용 상태가 30초 지속되면 통합 시도
+
+---
+# ── EC2NodeClass: "AWS 측 EC2 설정" ──────────────────────────────
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  amiFamily: AL2023                # Amazon Linux 2023 (최신, 권장)
+                                   # 다른 옵션: AL2, Bottlerocket, Ubuntu
+  amiSelectorTerms:                # 어떤 AMI 쓸지 선택
+    - alias: al2023@latest         # 최신 AL2023 AMI 자동 선택
+                                   # 또는 ID로: - id: ami-0123...
+
+  role: KarpenterNodeRole-eks-study   # 노드의 IAM Role
+                                       # 사전에 만들어 두어야 함 (기본 EKS 노드 정책 부착)
+
+  subnetSelectorTerms:             # 어느 서브넷에 노드를 띄울지
+    - tags:
+        karpenter.sh/discovery: eks-study   # 이 태그 가진 서브넷 자동 검색
+                                            # (보통 private 서브넷에 부착)
+
+  securityGroupSelectorTerms:      # 노드에 붙일 보안그룹
+    - tags:
+        karpenter.sh/discovery: eks-study   # 같은 태그로 SG 검색
+
+  blockDeviceMappings:             # 루트 EBS 설정
+    - deviceName: /dev/xvda        # AL2023 의 루트 디바이스
+      ebs:
+        volumeSize: 30Gi           # 30 GiB (시스템 + 컨테이너 이미지)
+        volumeType: gp3            # gp3 = 가성비 (gp2보다 저렴)
+        encrypted: true            # 암호화 (보안 권장)
+
+  tags:                            # 생성되는 EC2 인스턴스에 부착될 AWS 태그
+    Project: eks-study             # 비용 추적용
+    Provisioner: karpenter

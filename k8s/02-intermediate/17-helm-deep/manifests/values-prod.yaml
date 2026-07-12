@@ -1,0 +1,12 @@
+# Source: k8s/02-intermediate/17-helm-deep/lab-01-build-chart.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+environment: prod
+replicaCount: 3
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 60
+resources:
+  requests: { cpu: 200m, memory: 128Mi }
+  limits: { memory: 256Mi }

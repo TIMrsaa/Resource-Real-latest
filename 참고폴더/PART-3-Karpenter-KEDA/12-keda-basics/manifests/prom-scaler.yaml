@@ -1,0 +1,51 @@
+# =============================================================================
+# prom-scaler.yaml — Prometheus 메트릭 기반 KEDA 스케일링
+# =============================================================================
+# 시나리오:
+#   "order-service의 RPS(초당 요청) 가 일정 수준 넘으면 Pod 증가"
+#   = 트래픽 기반 자동 확장 (CPU 보다 더 정확한 비즈니스 지표)
+#
+# 동작 흐름:
+#   사용자 트래픽 ↑
+#       ↓
+#   Prometheus가 gin_request_duration_seconds_count 카운터 수집
+#       ↓ (KEDA가 15초마다 쿼리)
+#   sum(rate(...[1m])) = 분당 평균 RPS
+#       ↓
+#   threshold(10)와 비교 → Pod 수 = ceil(currentRPS / 10)
+#
+# 전제:
+#   • kube-prometheus-stack 설치됨 (08-observability)
+#   • order-service에 Prometheus 메트릭 노출 (Part-5-21)
+#   • ServiceMonitor로 메트릭 수집 등록됨
+# =============================================================================
+
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: order-service-rps
+  namespace: order                 # order-service가 있는 NS
+spec:
+  scaleTargetRef:
+    name: order-service            # 스케일링할 Deployment
+  minReplicaCount: 1               # 항상 1개는 유지 (콜드스타트 회피)
+  maxReplicaCount: 20
+  pollingInterval: 15              # 15초마다 Prometheus 쿼리
+  cooldownPeriod: 60
+  triggers:
+    - type: prometheus
+      metadata:
+        # Prometheus 서버 주소 (Service DNS)
+        # kube-prometheus-stack이 monitoring NS에 설치되었을 때 기본 이름
+        serverAddress: http://kps-kube-prometheus-stack-prometheus.monitoring:9090
+
+        threshold: "10"            # "메트릭 값 / threshold" 비율로 Pod 수 결정
+                                   # currentRPS=50, threshold=10 → Pod 5개
+
+        # PromQL 쿼리 (메트릭 값 산출)
+        # gin_request_duration_seconds_count = Gin 프레임워크의 요청 카운터
+        # rate(...[1m]) = 1분간 초당 증가량 = RPS
+        # sum(...) = 모든 Pod의 RPS 합계
+        query: |
+          sum(rate(gin_request_duration_seconds_count{namespace="order",pod=~"order-service.*"}[1m]))
+        # 10 RPS 당 Pod 1개 (threshold가 분모 역할)

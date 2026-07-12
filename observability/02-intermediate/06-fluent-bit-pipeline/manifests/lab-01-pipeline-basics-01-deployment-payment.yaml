@@ -1,0 +1,31 @@
+# Source: observability/02-intermediate/06-fluent-bit-pipeline/lab-01-pipeline-basics.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment
+  namespace: shop
+  labels: { app: payment }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: payment } }
+  template:
+    metadata: { labels: { app: payment, team: commerce } }
+    spec:
+      containers:
+        - name: app
+          image: busybox
+          command: ["sh","-c"]
+          args:
+            - |
+              while true; do
+                if [ $((RANDOM % 5)) -eq 0 ]; then
+                  echo "{\"level\":\"error\",\"event\":\"payment_failed\",\"user_id\":$((RANDOM%100)),\"reason\":\"timeout\"}";
+                else
+                  echo "{\"level\":\"info\",\"event\":\"payment_ok\",\"user_id\":$((RANDOM%100))}";
+                fi;
+                echo "GET /healthz 200";   # 소음 (비JSON, 걸러낼 대상)
+                sleep 1;
+              done

@@ -1,0 +1,22 @@
+# Source: cncf/03-advanced/29-dapr/lab-02-portability-and-mesh.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: dapr.io/v1alpha1
+kind: Resiliency
+metadata: { name: myapp-resiliency }
+spec:
+  policies:
+    retries:
+      retryForever:
+        policy: exponential
+        maxRetries: 3
+    circuitBreakers:
+      simpleCB:
+        maxRequests: 1
+        interval: 30s
+        timeout: 60s
+        trip: consecutiveFailures >= 5
+  targets:
+    apps:
+      subscriber:
+        retry: retryForever
+        circuitBreaker: simpleCB

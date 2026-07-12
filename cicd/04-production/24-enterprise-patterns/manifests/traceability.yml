@@ -1,0 +1,20 @@
+# Source: cicd/04-production/24-enterprise-patterns/lab-01-approval-and-audit.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: traceability
+on: [pull_request]
+permissions: { contents: read }
+jobs:
+  ticket-link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: PR 본문에 티켓 링크 필수 (컴플라이언스 ①추적성)
+        run: |
+          BODY=$(cat <<'PRBODY'
+          ${{ github.event.pull_request.body }}
+          PRBODY
+          )
+          echo "$BODY" | grep -qE "(JIRA|TICKET|ISSUE)-[0-9]+" || {
+            echo "🚨 티켓 참조 없음 — 'TICKET-123' 형식을 PR 본문에"; exit 1; }
+          echo "✅ 추적성: 변경 ↔ 티켓 연결됨"

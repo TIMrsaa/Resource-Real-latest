@@ -1,0 +1,86 @@
+# =============================================================================
+# echo-ingress.yaml — ALB Ingress 동작 확인용 echo 서버
+# =============================================================================
+# 흐름:
+#   인터넷 → AWS ALB (자동 생성) → Service:80 → echoserver Pod:80
+#
+# AWS Load Balancer Controller가 클러스터에 설치돼 있어야 동작!
+#   설치: lab-02-alb-controller.md
+#
+# echoserver는 받은 HTTP 요청을 그대로 JSON으로 돌려줌 (디버깅에 유용)
+#   curl http://<ALB-DNS>/   → 헤더, 메서드, 경로 등이 JSON으로
+#
+# 적용:  kubectl apply -f echo-ingress.yaml
+# 확인:  kubectl get ingress echo
+#       (ADDRESS 컬럼에 ALB DNS 뜨면 ~2분 후 접근 가능)
+# 삭제:  kubectl delete -f echo-ingress.yaml  ← 잊으면 ALB 비용!
+# =============================================================================
+
+# ── 1. echoserver Deployment ─────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echoserver
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: echoserver }
+  template:
+    metadata:
+      labels: { app: echoserver }
+    spec:
+      containers:
+        - name: echo
+          image: ealen/echo-server:0.9.2   # 받은 요청을 그대로 JSON으로 돌려줌
+          ports: [{ containerPort: 80 }]
+
+---
+# ── 2. ClusterIP Service (Ingress가 가리킬 백엔드) ───────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: echoserver
+spec:
+  type: ClusterIP                # ALB는 외부, Service는 내부면 충분
+  selector: { app: echoserver }
+  ports:
+    - port: 80
+      targetPort: 80
+
+---
+# ── 3. Ingress (ALB 자동 생성 트리거) ────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: echo
+  annotations:
+    # ── ALB 동작 옵션 (AWS Load Balancer Controller가 해석) ──
+    # internet-facing : 퍼블릭 ALB (외부 접근)
+    # internal        : 사설 ALB (VPC 내부 전용)
+    alb.ingress.kubernetes.io/scheme: internet-facing
+
+    # target-type: ip       = Pod IP를 직접 ALB 타깃으로 등록 (VPC CNI 필수, 권장)
+    #              instance = 노드 IP + NodePort로 (호스트 모드)
+    alb.ingress.kubernetes.io/target-type: ip
+
+    # ALB가 백엔드 Pod 헬스체크할 때 어디로 GET?
+    alb.ingress.kubernetes.io/healthcheck-path: /
+
+    # ALB가 listen할 포트들 (JSON 배열)
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    # HTTPS도 쓰려면:
+    # alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:...:certificate/...
+
+spec:
+  ingressClassName: alb         # AWS Load Balancer Controller 가 처리
+                                # (다른 옵션: nginx, contour 등)
+  rules:
+    - http:                     # host 미지정 시 모든 도메인에 적용
+        paths:
+          - path: /             # 모든 경로
+            pathType: Prefix    # / 로 시작하는 모든 경로 매칭
+            backend:
+              service:
+                name: echoserver
+                port: { number: 80 }

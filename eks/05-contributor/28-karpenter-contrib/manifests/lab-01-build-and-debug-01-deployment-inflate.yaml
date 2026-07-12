@@ -1,0 +1,17 @@
+# Source: eks/05-contributor/28-karpenter-contrib/lab-01-build-and-debug.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: inflate }
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: inflate } }
+  template:
+    metadata: { labels: { app: inflate } }
+    spec:
+      tolerations: [{ key: lab, value: karpenter, effect: NoSchedule }]
+      nodeSelector: { karpenter.sh/nodepool: lab }
+      containers:
+      - name: pause
+        image: public.ecr.aws/eks-distro/kubernetes/pause:3.10
+        resources: { requests: { cpu: "1" } }

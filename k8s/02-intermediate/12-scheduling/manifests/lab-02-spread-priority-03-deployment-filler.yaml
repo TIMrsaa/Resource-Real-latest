@@ -1,0 +1,22 @@
+# Source: k8s/02-intermediate/12-scheduling/lab-02-spread-priority.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filler
+  labels: { app: filler }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: filler }
+  template:
+    metadata:
+      labels: { app: filler }
+    spec:
+      priorityClassName: peasant           # 낮은 우선순위 — 선점당할 운명
+      containers:
+        - name: filler
+          image: public.ecr.aws/docker/library/busybox:stable
+          command: ["sleep", "3600"]
+          resources:
+            requests: { cpu: 1200m }       # 노드 CPU를 채우는 크기 (환경에 맞게 조정)

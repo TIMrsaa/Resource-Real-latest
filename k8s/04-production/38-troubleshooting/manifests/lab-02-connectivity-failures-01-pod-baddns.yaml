@@ -1,0 +1,16 @@
+# Source: k8s/04-production/38-troubleshooting/lab-02-connectivity-failures.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: baddns
+  namespace: dr-lab
+  labels: { run: baddns }
+spec:
+  dnsPolicy: "None"                          # 클러스터 DNS를 버리고
+  dnsConfig:
+    nameservers: ["10.255.255.1"]            # 죽은 네임서버를 지정 (고장 재현)
+  containers:
+    - name: baddns
+      image: public.ecr.aws/docker/library/busybox:stable
+      command: ["sleep", "600"]

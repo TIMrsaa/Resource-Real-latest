@@ -1,0 +1,19 @@
+# Source: k8s/02-intermediate/13-autoscaling/lab-02-behavior-vpa.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: php-apache }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: php-apache }
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource: { name: cpu, target: { type: Utilization, averageUtilization: 50 } }
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies: [{ type: Percent, value: 100, periodSeconds: 15 }]
+    scaleDown:
+      stabilizationWindowSeconds: 600          # 10분
+      policies: [{ type: Pods, value: 1, periodSeconds: 60 }]   # 분당 1개

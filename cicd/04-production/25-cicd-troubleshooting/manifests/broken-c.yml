@@ -1,0 +1,18 @@
+# Source: cicd/04-production/25-cicd-troubleshooting/lab-02-game-day.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+name: broken-c
+on: [workflow_dispatch]
+permissions: { contents: read }
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 테스트 실행
+        run: |
+          mkdir -p results
+          echo "no tests found matching '**/*.spec.js'" 
+          echo '<testsuite tests="0" failures="0"/>' > results/junit.xml
+      - name: 결과 판정
+        run: |
+          grep -q 'failures="0"' results/junit.xml && echo "✅ 테스트 통과!"

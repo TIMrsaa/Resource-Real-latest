@@ -1,0 +1,22 @@
+# Source: cicd/03-advanced/18-custom-actions-dev/lab-01-build-action.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+name: 'Digest Enforcer'
+description: '매니페스트의 이미지 참조가 다이제스트(@sha256)인지 검증 (04의 불변성 강제)'
+inputs:
+  path:
+    description: '검사할 매니페스트 파일/디렉터리'
+    required: true
+    default: '.'
+  fail-on-tag:
+    description: '태그 발견 시 실패할지'
+    required: false
+    default: 'true'
+outputs:
+  violations:
+    description: '태그로 참조된 이미지 수'
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+branding:
+  icon: 'lock'
+  color: 'blue'

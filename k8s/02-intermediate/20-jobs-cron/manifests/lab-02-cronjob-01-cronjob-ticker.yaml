@@ -1,0 +1,21 @@
+# Source: k8s/02-intermediate/20-jobs-cron/lab-02-cronjob.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: batch/v1
+kind: CronJob
+metadata: { name: ticker }
+spec:
+  schedule: "* * * * *"
+  timeZone: "Asia/Seoul"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: tick
+            image: public.ecr.aws/docker/library/busybox:stable
+            command: ["sh", "-c", "date; echo tick"]

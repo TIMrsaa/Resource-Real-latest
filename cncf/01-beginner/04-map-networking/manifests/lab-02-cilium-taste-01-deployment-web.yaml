@@ -1,0 +1,39 @@
+# Source: cncf/01-beginner/04-map-networking/lab-02-cilium-taste.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels: { app: web }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector: { app: web }
+  ports:
+    - port: 80
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client
+  labels: { run: client }
+spec:
+  restartPolicy: Never
+  containers:
+    - name: client
+      image: busybox
+      command: ["sleep", "3600"]

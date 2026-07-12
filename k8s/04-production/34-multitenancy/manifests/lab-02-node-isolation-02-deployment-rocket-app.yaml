@@ -1,0 +1,25 @@
+# Source: k8s/04-production/34-multitenancy/lab-02-node-isolation.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: rocket-app, namespace: team-rocket }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: rocket-app } }
+  template:
+    metadata: { labels: { app: rocket-app } }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, seccompProfile: { type: RuntimeDefault } }
+      tolerations:                # ① 입장권 — taint를 견딥니다
+      - { key: tenant, operator: Equal, value: team-rocket, effect: NoSchedule }
+      affinity:                   # ② 유인 — 입장권만 있으면 공용 노드로도 갈 수 있으므로
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - { key: tenant, operator: In, values: [team-rocket] }
+      containers:
+      - name: app
+        image: public.ecr.aws/docker/library/busybox:stable
+        command: [sleep, "600"]
+        securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }

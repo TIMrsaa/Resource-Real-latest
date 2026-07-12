@@ -1,0 +1,36 @@
+# Source: cicd/05-contributor/28-tekton-contrib/lab-02-tep-and-catalog.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: digest-enforcer
+  labels: { app.kubernetes.io/version: "0.1" }
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.50.0"
+    tekton.dev/categories: Security
+    tekton.dev/tags: "security, supply-chain"
+    tekton.dev/displayName: "Digest Enforcer"
+spec:
+  description: >-
+    매니페스트의 이미지 참조가 다이제스트(@sha256)를 쓰는지 검증합니다.
+    태그 참조 발견 시 실패합니다 (불변성 강제 — 공급망 규율).
+  params:
+    - name: path
+      description: 검사할 매니페스트 디렉터리
+      default: "."
+  workspaces:
+    - name: source
+      description: 매니페스트가 있는 워크스페이스
+  steps:
+    - name: enforce
+      image: alpine@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1  # ★ 다이제스트 고정 (04 — 심사 기준!)
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/sh
+        set -e
+        VIOLATIONS=$(grep -rhoE "image:\s*\S+" "$(params.path)" 2>/dev/null \
+          | grep -v "@sha256:" | grep ":" | wc -l)
+        echo "태그 참조 위반: ${VIOLATIONS}건"
+        [ "$VIOLATIONS" -eq 0 ] || { echo "🚨 다이제스트(@sha256)를 쓰세요"; exit 1; }

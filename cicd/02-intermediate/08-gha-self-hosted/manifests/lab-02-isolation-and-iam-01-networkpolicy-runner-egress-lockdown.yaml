@@ -1,0 +1,17 @@
+# Source: cicd/02-intermediate/08-gha-self-hosted/lab-02-isolation-and-iam.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: runner-egress-lockdown
+  namespace: arc-runners
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/component: runner }
+  policyTypes: [Egress]
+  egress:
+  - to: []                          # DNS
+    ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+  - to: []                          # HTTPS (GitHub, ECR, 패키지 레지스트리)
+    ports: [{ protocol: TCP, port: 443 }]
+    # ★ 내부 대역(10.0.0.0/8 등)으로의 임의 접근은 허용하지 않습니다

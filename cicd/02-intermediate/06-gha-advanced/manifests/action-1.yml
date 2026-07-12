@@ -1,0 +1,10 @@
+# Source: cicd/02-intermediate/06-gha-advanced/lab-01-reusable.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+name: broken
+description: composite에 잡 속성을 넣으면?
+runs:
+  using: composite
+  runs-on: ubuntu-latest      # 🚨 잡의 속성 — 여기 올 수 없습니다
+  steps:
+    - shell: bash
+      run: echo hi

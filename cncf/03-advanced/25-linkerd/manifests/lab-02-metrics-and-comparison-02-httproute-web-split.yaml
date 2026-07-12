@@ -1,0 +1,11 @@
+# Source: cncf/03-advanced/25-linkerd/lab-02-metrics-and-comparison.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: { name: web-split }
+spec:
+  parentRefs: [{ name: web, kind: Service, group: core, port: 8080 }]
+  rules:
+    - backendRefs:
+        - { name: web, port: 8080, weight: 90 }
+        - { name: web-v2, port: 8080, weight: 10 }

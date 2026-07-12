@@ -1,0 +1,58 @@
+# =============================================================================
+# payment-with-resources.yaml — Karpenter + KEDA 콤보 시연용 payment-service
+# =============================================================================
+# Module 14의 시나리오:
+#   "큐 폭주 → KEDA가 Pod 폭증 → 기존 노드 자원 부족 → Karpenter가 노드 자동 증설"
+#
+#   1) SQS에 메시지 1000개 한번에 던짐
+#   2) KEDA 감지 (15초 후) → payment-service replicas 0 → 30
+#   3) 30개 Pod이 Pending (기존 노드 부족)
+#   4) Karpenter 감지 (수 초) → EC2 인스턴스 N개 생성
+#   5) 노드 Ready (~60초) → Pod 스케줄링
+#   6) Pod이 SQS 메시지 처리 → 큐 비워짐
+#   7) KEDA가 cooldown 후 replicas 0으로 (scale-to-zero)
+#   8) Karpenter가 빈 노드 30초 후 종료 → 비용 0
+#
+# 이 파일은 그 시나리오용으로 payment-service의 resources를 명확화 +
+# Karpenter 노드만 사용하도록 nodeSelector 추가.
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: order
+spec:
+  replicas: 0                      # KEDA가 관리. 시작 시 0개
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: payment-service
+                                   # app.kubernetes.io/* 는 K8s 표준 라벨
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: payment-service
+    spec:
+      serviceAccountName: payment-service
+                                   # IRSA로 SQS 접근 권한 받음
+      nodeSelector:
+        managed-by: karpenter      # ★ Karpenter 노드에만 스케줄
+                                   # 기존 NodeGroup 노드 안 씀 = 시연 명확
+      containers:
+        - name: app
+          # ECR 이미지 경로 (ACCOUNT_ID는 환경에 맞게 치환)
+          image: ACCOUNT_ID.dkr.ecr.ap-northeast-2.amazonaws.com/eks-study/payment-service:latest
+          ports:
+            - {name: metrics, containerPort: 9090}    # Prometheus 메트릭 + 헬스체크
+          env:
+            - {name: SQS_QUEUE_URL, value: SQS_URL}   # SQS_URL은 실제로 치환
+            - {name: AWS_REGION, value: ap-northeast-2}
+          readinessProbe:
+            httpGet: {path: /healthz, port: metrics}
+            periodSeconds: 5
+          resources:
+            # ★ 시연 핵심: requests를 일부러 크게 → Pod 늘면 노드 부족 빨리 발생
+            requests: {cpu: 100m, memory: 64Mi}
+            limits:   {cpu: 300m, memory: 128Mi}
+            # t3.medium(2vCPU=2000m) 한 대당 ~15 Pod이 한계
+            # → replicas 30이면 노드 2~3대 추가 필요

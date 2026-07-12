@@ -1,0 +1,24 @@
+# Source: cncf/02-intermediate/18-keda/lab-02-scalers-and-jobs.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata: { name: long-task }
+spec:
+  jobTargetRef:
+    backoffLimit: 2
+    template:
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: task
+            image: busybox
+            command: ["sh","-c","echo '긴 작업 시작'; sleep 20; echo '완료'"]
+  pollingInterval: 15
+  maxReplicaCount: 5
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  scalingStrategy: { strategy: "accurate" }   # 대기 중인 잡을 고려해 과잉 생성 방지
+  triggers:
+    - type: rabbitmq
+      metadata: { protocol: amqp, queueName: tasks, mode: QueueLength, value: "3" }
+      authenticationRef: { name: rabbit-auth }

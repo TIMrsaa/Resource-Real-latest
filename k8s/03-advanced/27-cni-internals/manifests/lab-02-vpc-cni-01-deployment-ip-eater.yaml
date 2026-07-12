@@ -1,0 +1,19 @@
+# Source: k8s/03-advanced/27-cni-internals/lab-02-vpc-cni.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ip-eater
+  labels: { app: ip-eater }
+spec:
+  replicas: 40
+  selector:
+    matchLabels: { app: ip-eater }
+  template:
+    metadata:
+      labels: { app: ip-eater }
+    spec:
+      containers:
+        - name: ip-eater
+          image: public.ecr.aws/docker/library/busybox:stable
+          command: ["sleep", "3600"]

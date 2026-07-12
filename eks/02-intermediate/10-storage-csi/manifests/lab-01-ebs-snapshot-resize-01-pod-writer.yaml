@@ -1,0 +1,28 @@
+# Source: eks/02-intermediate/10-storage-csi/lab-01-ebs-snapshot-resize.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata: { name: gp3-x }
+provisioner: ebs.csi.aws.com
+parameters: { type: gp3, encrypted: "true" }
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: data, namespace: storage-lab }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: gp3-x
+  resources: { requests: { storage: 4Gi } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: writer, namespace: storage-lab }
+spec:
+  volumes: [{ name: d, persistentVolumeClaim: { claimName: data } }]
+  containers:
+  - name: c
+    image: public.ecr.aws/docker/library/busybox:stable
+    command: [sh, -c, 'echo "v1 precious" > /data/file && df -h /data && sleep 3600']
+    volumeMounts: [{ name: d, mountPath: /data }]

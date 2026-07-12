@@ -1,0 +1,92 @@
+# 테넌트 패키지 5종 세트 — "team-rocket" 팀의 예
+# 사용: TENANT 이름만 바꿔 복제 (실무에선 Helm values 또는 Tenant Operator로)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-rocket
+  labels:
+    tenant: team-rocket
+    cost-center: team-rocket
+    # ⑤ PSA — 안전 수칙
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+---
+# ① RBAC — 자기 방만 (그룹은 IdP/IAM 매핑 가정 — 모듈 11)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: team-rocket-edit
+  namespace: team-rocket
+subjects:
+- kind: Group
+  name: team-rocket-devs
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: edit                      # secrets 접근까지 줄지는 팀 신뢰도에 따라 커스텀
+  apiGroup: rbac.authorization.k8s.io
+---
+# ② ResourceQuota — 전기요금 한도
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+  namespace: team-rocket
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.memory: 16Gi
+    pods: "30"
+    services.loadbalancers: "0"   # LB는 플랫폼팀 승인제 (비용 가드)
+    persistentvolumeclaims: "10"
+    requests.storage: 100Gi
+---
+# ③ LimitRange — Quota의 짝꿍 (기본값 주입)
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tenant-defaults
+  namespace: team-rocket
+spec:
+  limits:
+  - type: Container
+    defaultRequest: { cpu: 100m, memory: 128Mi }
+    default: { memory: 256Mi }
+    max: { cpu: "2", memory: 4Gi }       # 단일 컨테이너 폭주 상한
+---
+# ④-1 NetworkPolicy — 기본 거부
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: team-rocket
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# ④-2 같은 ns 안은 허용
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: team-rocket
+spec:
+  podSelector: {}
+  ingress:
+  - from:
+    - podSelector: {}
+---
+# ④-3 (옵션) 플랫폼 공용 ingress-gateway/모니터링에서의 접근 허용
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-platform
+  namespace: team-rocket
+spec:
+  podSelector: {}
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels: { platform: "true" }   # 플랫폼 ns들에 이 라벨을 달아두는 규약

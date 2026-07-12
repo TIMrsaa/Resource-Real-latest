@@ -1,0 +1,37 @@
+# Source: cicd/02-intermediate/06-gha-advanced/lab-01-reusable.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: ci
+on: [push, workflow_dispatch]
+permissions:
+  contents: read
+
+jobs:
+  # ── 방식 A: reusable workflow — 잡 전체를 위임
+  standard-ci:
+    uses: $SHARED/.github/workflows/reusable-ci.yml@$SHA   # ★ SHA 고정
+    with:
+      python-version: "3.13"
+      run-integration: true
+    # secrets: 필요한 것만 명시 (inherit 금지)
+
+  # ── 방식 B: composite action — 내 잡 안에서 스텝만 재사용
+  custom-job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: $SHARED/setup-python-app@$SHA                 # ★ 스텝 자리
+        with:
+          python-version: "3.11"
+      - run: echo "이 잡은 내가 통제한다"
+
+  # ── 결과 수렴 (03의 게이트 패턴)
+  ci:
+    if: always()
+    needs: [standard-ci, custom-job]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "reusable outputs: \${{ needs.standard-ci.outputs.tested-version }}"
+          [ "\${{ needs.standard-ci.result }}" = "success" ] && [ "\${{ needs.custom-job.result }}" = "success" ]

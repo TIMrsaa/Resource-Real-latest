@@ -1,0 +1,8 @@
+# Source: eks/04-production/21-upgrades-prod/lab-02-bluegreen-nodes.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: fleet-app-pdb }
+spec:
+  maxUnavailable: 1
+  selector: { matchLabels: { app: fleet-app } }

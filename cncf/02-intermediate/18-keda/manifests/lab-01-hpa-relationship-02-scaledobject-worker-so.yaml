@@ -1,0 +1,18 @@
+# Source: cncf/02-intermediate/18-keda/lab-01-hpa-relationship.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: worker-so }
+spec:
+  scaleTargetRef: { name: worker }
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  pollingInterval: 15
+  cooldownPeriod: 60
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prom-prometheus-server.mon.svc:80
+        query: sum(prometheus_http_requests_total)     # 아무 메트릭 (계속 증가)
+        threshold: "500"                # ★ scaling: Pod 하나가 500을 담당
+        activationThreshold: "100"      # ★ activation: 100 넘어야 0→1

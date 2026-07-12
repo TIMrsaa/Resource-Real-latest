@@ -1,0 +1,32 @@
+# Source: observability/03-advanced/18-opensearch-logs/lab-01-index-and-pipeline.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment
+  labels: { app: payment }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: payment }
+  template:
+    metadata:
+      labels: { app: payment }
+    spec:
+      containers:
+        - name: payment
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              while true; do
+                u=$((RANDOM % 50));
+                if [ $((RANDOM % 4)) -eq 0 ]; then
+                  echo "{\"level\":\"error\",\"event\":\"pg_timeout\",\"user_id\":\"u$u\",\"message\":\"gateway timeout after 3 retries\"}";
+                else
+                  echo "{\"level\":\"info\",\"event\":\"payment_ok\",\"user_id\":\"u$u\",\"message\":\"payment processed normally\"}";
+                fi; sleep 0.3;
+              done

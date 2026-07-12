@@ -1,0 +1,46 @@
+# =============================================================================
+# storageclass-gp3.yaml — StorageClass (PVC가 동적으로 PV 만들 때 쓸 템플릿)
+# =============================================================================
+# StorageClass 역할:
+#   "PVC가 들어오면 어떤 종류의 디스크를 어떻게 만들지" 정의
+#
+# 사용 흐름:
+#   PVC (storageClassName: gp3) → SC(gp3) 참조 → ebs.csi.aws.com이 EBS gp3 생성
+#
+# AWS EBS 종류:
+#   • gp2 : 구형 범용 SSD (1Gi당 3 IOPS)
+#   • gp3 : 신형 범용 SSD. gp2보다 20% 저렴, IOPS/처리량 독립 설정 가능 (권장)
+#   • io1/io2 : 고성능 SSD (DB용)
+#   • st1 : 처리량 최적화 HDD (로그/빅데이터)
+#
+# 적용:  kubectl apply -f storageclass-gp3.yaml
+# 확인:  kubectl get sc
+# =============================================================================
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    # 이 SC를 클러스터 기본값으로 지정. PVC가 storageClassName 안 적으면 이걸 씀
+    storageclass.kubernetes.io/is-default-class: "true"
+
+provisioner: ebs.csi.aws.com    # 어떤 CSI 드라이버가 처리할지
+                                # (ebs.csi.aws.com = AWS EBS CSI Driver)
+
+# WaitForFirstConsumer: Pod이 어느 노드에 스케줄될지 결정된 후에야 EBS 생성
+#                       → Pod의 AZ에 맞는 EBS 생성 (필수! EBS는 AZ 종속)
+# Immediate          : PVC 생성 즉시 EBS 만듦 (AZ 미스매치 위험)
+volumeBindingMode: WaitForFirstConsumer
+
+# Delete : PVC 삭제 시 EBS도 함께 삭제 (개발 환경)
+# Retain : PVC 삭제해도 EBS 보존 (운영 환경, 데이터 보호)
+reclaimPolicy: Delete
+
+parameters:                     # provisioner에 넘길 옵션 (CSI 마다 다름)
+  type: gp3                     # EBS 볼륨 타입
+  fsType: ext4                  # 파일시스템 (ext4, xfs 가능)
+  # 추가 옵션 예시:
+  #   iops: "3000"              # gp3는 기본 3000, 최대 16000
+  #   throughput: "125"         # MB/s, 기본 125, 최대 1000
+  #   encrypted: "true"         # 암호화 (실무 권장)

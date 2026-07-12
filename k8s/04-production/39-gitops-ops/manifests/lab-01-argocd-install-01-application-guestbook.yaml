@@ -1,0 +1,19 @@
+# Source: k8s/04-production/39-gitops-ops/lab-01-argocd-install.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: guestbook
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/argoproj/argocd-example-apps
+    targetRevision: HEAD
+    path: guestbook
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: guestbook
+  syncPolicy:
+    syncOptions: [CreateNamespace=true]
+    # automated는 아직 안 켭니다 — 수동 동기화부터 (theory §5의 점진 도입)

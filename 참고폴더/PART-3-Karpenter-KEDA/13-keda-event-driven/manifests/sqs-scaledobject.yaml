@@ -1,0 +1,68 @@
+# =============================================================================
+# sqs-scaledobject.yaml — AWS SQS 큐 길이 기반 KEDA 스케일링
+# =============================================================================
+# 시나리오:
+#   "결제 큐(SQS) 메시지가 쌓이면 payment-service Pod 증가, 비면 0개로"
+#   = 큐 폭주 → Pod 폭증 → 노드 자동 증설 (Karpenter) 의 핵심 패턴
+#
+# 동작:
+#   주문 폭주 → SQS 큐 메시지 ↑
+#       ↓ (KEDA가 15초마다 큐 길이 조회)
+#   ApproximateNumberOfMessages 메트릭 수집
+#       ↓
+#   Pod 수 = ceil(메시지 수 / queueLength)
+#       예: 메시지 100개, queueLength=5 → Pod 20개
+#
+# IRSA 인증 (TriggerAuthentication):
+#   AWS API 호출에 IAM 자격 필요 → ServiceAccount에 IAM Role 매핑
+#   이 SA로 KEDA가 SQS API 호출
+#
+# 전제:
+#   • AWS SQS 큐 'eks-study-payments' 사전 생성
+#   • IAM Role: SQS:GetQueueAttributes 권한
+#   • ServiceAccount 'payment-service' 에 IRSA 설정
+# =============================================================================
+
+# ── TriggerAuthentication: AWS 인증 정보 출처 정의 ──────────────
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: aws-sqs-auth
+  namespace: order
+spec:
+  podIdentity:
+    provider: aws                  # AWS Pod Identity / IRSA 사용
+                                   # 다른 옵션: azure, gcp, none(시크릿 직접)
+
+---
+# ── ScaledObject: SQS 큐 길이 트리거 ────────────────────────────
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: payment-service
+  namespace: order
+spec:
+  scaleTargetRef:
+    name: payment-service
+  minReplicaCount: 0               # 큐 비면 Pod 0개 (비용 0원)
+                                   # 단점: 콜드스타트. 첫 메시지 처리에 ~30초
+  maxReplicaCount: 30              # 큐 폭주해도 30개 까지만
+                                   # = 비용 안전장치 (SQS 백프레셔로 처리량 조절)
+  pollingInterval: 15              # 15초마다 큐 길이 조회
+                                   # 짧을수록 반응 빠름, AWS API 호출 비용 ↑
+  cooldownPeriod: 90               # 큐 비고 90초 더 유지 후 0으로
+                                   # 한국어로: "큐가 잠깐 비어도 90초간은 안 죽임"
+  triggers:
+    - type: aws-sqs-queue
+      authenticationRef:
+        name: aws-sqs-auth         # 위에서 만든 인증 참조
+      metadata:
+        # SQS 큐 URL (AWS 콘솔에서 복사)
+        # ACCOUNT_ID 부분은 실제 계정 ID로 치환 필요
+        queueURL: https://sqs.ap-northeast-2.amazonaws.com/ACCOUNT_ID/eks-study-payments
+        queueLength: "5"           # 메시지 5개당 Pod 1개
+                                   # 예: 큐에 100개 → 100/5 = 20 Pod
+                                   # 너무 작으면 Pod 폭증, 너무 크면 처리 느림
+        awsRegion: ap-northeast-2
+        identityOwner: operator    # operator: KEDA 운영자 SA의 IAM 사용
+                                   # pod     : 대상 Pod의 SA의 IAM 사용 (권장)

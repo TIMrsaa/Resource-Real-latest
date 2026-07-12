@@ -1,0 +1,18 @@
+# Source: cncf/03-advanced/24-istio/lab-02-security-and-ambient.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# 기본 거부
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: { name: deny-all }
+spec: {}                         # 빈 spec = 모두 거부
+---
+# client의 SA만 reviews에 GET 허용
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: { name: allow-client }
+spec:
+  selector: { matchLabels: { app: reviews } }
+  action: ALLOW
+  rules:
+    - from: [{ source: { principals: ["cluster.local/ns/demo/sa/default"] } }]
+      to: [{ operation: { methods: ["GET"] } }]

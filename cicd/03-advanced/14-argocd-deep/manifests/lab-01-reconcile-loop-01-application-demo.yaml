@@ -1,0 +1,23 @@
+# Source: cicd/03-advanced/14-argocd-deep/lab-01-reconcile-loop.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: $REPO_URL
+    path: apps/demo
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitops-demo
+  syncPolicy:
+    automated:
+      selfHeal: true       # ★ 드리프트 교정
+      prune: true          # ★ git 삭제 반영
+    syncOptions: [ CreateNamespace=true ]

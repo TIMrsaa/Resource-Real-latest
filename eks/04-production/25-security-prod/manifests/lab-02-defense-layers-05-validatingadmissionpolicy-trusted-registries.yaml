@@ -1,0 +1,23 @@
+# Source: eks/04-production/25-security-prod/lab-02-defense-layers.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: { name: trusted-registries }
+spec:
+  matchConstraints:
+    resourceRules:
+    - { apiGroups: [""], apiVersions: ["v1"], operations: ["CREATE"], resources: ["pods"] }
+  validations:
+  - expression: >-
+      object.spec.containers.all(c,
+        c.image.startsWith('public.ecr.aws/') || c.image.startsWith('ghcr.io/stefanprodan/'))
+    message: "허용되지 않은 레지스트리입니다"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata: { name: trusted-registries }
+spec:
+  policyName: trusted-registries
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: seclab } }

@@ -1,0 +1,13 @@
+# Source: cicd/04-production/25-cicd-troubleshooting/lab-01-break-and-diagnose.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+name: deploy-stuck
+on: [workflow_dispatch]
+permissions: { contents: read }
+concurrency:
+  group: production-deploy        # 그룹당 1개
+  cancel-in-progress: false       # 배포는 취소 금지 (옳음) — 그러나...
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production       # 🐛 승인 대기가 그룹을 점유합니다!
+    steps: [{ run: echo deploying }]

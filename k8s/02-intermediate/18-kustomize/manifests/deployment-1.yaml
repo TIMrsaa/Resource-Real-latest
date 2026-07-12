@@ -1,0 +1,26 @@
+# Source: k8s/02-intermediate/18-kustomize/lab-02-generators-helm.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      volumes:
+      - name: config
+        configMap: { name: app-config }     # ← 제너레이터가 이 이름을 해시 이름으로 바꿔줍니다
+      containers:
+      - name: web
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        args: ["netexec", "--http-port=8080"]
+        ports: [{ containerPort: 8080 }]
+        readinessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+        volumeMounts:
+        - { name: config, mountPath: /etc/config }

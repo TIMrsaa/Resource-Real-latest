@@ -1,0 +1,26 @@
+# Source: observability/04-production/22-observability-cost/lab-01-meta-observability.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+config:
+  service: |
+    [SERVICE]
+        Flush        1
+        HTTP_Server  On
+        HTTP_Port    2020
+  inputs: |
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*.log
+        Tag               kube.*
+        multiline.parser  cri
+        DB                /var/log/flb_meta.db
+  filters: |
+    [FILTER]
+        Name    kubernetes
+        Match   kube.*
+        Merge_Log On
+  outputs: |
+    [OUTPUT]
+        Name    null
+        Match   kube.*
+serviceMonitor:
+  enabled: true          # ★ Fluent Bit 자기 메트릭을 Prometheus로!

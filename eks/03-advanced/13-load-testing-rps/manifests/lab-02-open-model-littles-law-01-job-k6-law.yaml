@@ -1,0 +1,18 @@
+# Source: eks/03-advanced/13-load-testing-rps/lab-02-open-model-littles-law.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: batch/v1
+kind: Job
+metadata: { name: k6-law, namespace: loadlab }
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: k6
+        image: grafana/k6:0.57.0
+        args: [run, /scripts/load.js]
+        env: [{ name: VUS, value: "50" }, { name: DURATION, value: "60s" }]
+        resources: { requests: { cpu: 500m, memory: 256Mi } }
+        volumeMounts: [{ name: s, mountPath: /scripts }]
+      volumes: [{ name: s, configMap: { name: k6-delay } }]

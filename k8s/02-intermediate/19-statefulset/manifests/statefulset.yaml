@@ -1,0 +1,43 @@
+# Headless Service + StatefulSet (멤버별 PVC)
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+spec:
+  clusterIP: None              # Headless — 멤버 직통 DNS용
+  selector: { app: db }
+  ports: [{ port: 8080 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+spec:
+  serviceName: db              # Headless Service와 결합 (멤버 DNS의 토대)
+  replicas: 3
+  selector:
+    matchLabels: { app: db }
+  template:
+    metadata:
+      labels: { app: db }
+    spec:
+      containers:
+      - name: db
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        args: ["netexec", "--http-port=8080"]
+        ports: [{ containerPort: 8080 }]
+        readinessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+          periodSeconds: 3
+        volumeMounts:
+        - { name: data, mountPath: /data }
+        resources:
+          requests: { cpu: 50m, memory: 64Mi }
+  volumeClaimTemplates:        # 멤버마다 PVC 자동 생성 (data-db-0, data-db-1, ...)
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ReadWriteOnce]
+      storageClassName: gp3
+      resources:
+        requests: { storage: 1Gi }

@@ -1,0 +1,20 @@
+# Source: k8s/03-advanced/29-hidden-features/lab-01-new-weapons.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: batch/v1
+kind: Job
+metadata: { name: smart-retry }
+spec:
+  backoffLimit: 5
+  podFailurePolicy:
+    rules:
+    - action: FailJob              # 코드 42 = 데이터 자체가 글러먹음 → 재시도 무의미
+      onExitCodes: { containerName: worker, operator: In, values: [42] }
+    - action: Ignore               # 노드 사정(축출)은 카운트하지 않기
+      onPodConditions: [{ type: DisruptionTarget }]
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: worker
+        image: public.ecr.aws/docker/library/busybox:stable
+        command: ["sh", "-c", "echo 'bad data!'; exit 42"]

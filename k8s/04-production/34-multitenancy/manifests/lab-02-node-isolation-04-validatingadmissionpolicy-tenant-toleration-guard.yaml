@@ -1,0 +1,32 @@
+# Source: k8s/04-production/34-multitenancy/lab-02-node-isolation.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-toleration-guard
+spec:
+  matchConstraints:
+    resourceRules:
+    - apiGroups: [""]
+      apiVersions: ["v1"]
+      operations: ["CREATE"]
+      resources: ["pods"]
+  validations:
+  - expression: >-
+      !has(object.spec.tolerations) ||
+      object.spec.tolerations.all(t,
+        !has(t.key) || t.key != 'tenant' ||
+        (has(t.value) && t.value == namespaceObject.metadata.labels['tenant']))
+    message: "tenant toleration은 자기 네임스페이스의 tenant 라벨 값만 허용됩니다"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-toleration-guard
+spec:
+  policyName: tenant-toleration-guard
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+      - { key: tenant, operator: Exists }     # tenant ns에만 적용

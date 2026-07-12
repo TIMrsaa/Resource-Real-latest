@@ -1,0 +1,24 @@
+# Source: cicd/02-intermediate/10-codebuild-deep/lab-01-buildspec-cache.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+version: 0.2
+phases:
+  install:
+    runtime-versions: { python: 3.12 }
+    commands:
+      - echo "[install] 런타임 준비"
+  pre_build:
+    commands:
+      - echo "[pre_build] 의존성 설치 시작"
+      - pip install -r requirements.txt
+  build:
+    commands:
+      - echo "[build] 조리 중"
+      - python -c "import flask; print('flask', flask.__version__)"
+    finally:
+      - echo "[build.finally] 성공이든 실패든 항상 실행 (Actions의 if:always)"
+  post_build:
+    commands:
+      - echo "[post_build] 마무리"
+cache:
+  paths:
+    - "/root/.cache/pip/**/*"        # ★ pip 캐시를 S3로 (04의 캐시 마운트 대응)

@@ -1,0 +1,68 @@
+{{/*
+=============================================================================
+deployment.yaml (Helm template) — values.yaml의 값을 받아 Deployment 렌더링
+=============================================================================
+Helm 템플릿 문법 핵심:
+  {{ .Values.X }}          → values.yaml의 X 값 삽입
+  {{- if Y }} ... {{- end }} → 조건부 렌더링 (앞 - 는 공백 제거)
+  {{ include "name" . }}   → _helpers.tpl의 named template 호출
+  {{ toYaml X | nindent 4 }} → X를 YAML로 변환 후 4칸 들여쓰기
+
+`{{- ` (대시)의 의미: 이 표현식 앞의 공백/줄바꿈을 제거 (깔끔한 출력)
+
+검증: helm lint .
+미리보기: helm template . --set image.repository=foo/bar
+=============================================================================
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # _helpers.tpl 의 fullname template 호출 → "릴리즈명-차트명" 형태
+  name: {{ include "order-service.fullname" . }}
+  labels:
+    # 공통 라벨 묶음 (app.kubernetes.io/* 표준 라벨)
+    {{- include "order-service.labels" . | nindent 4 }}
+spec:
+  # autoscaling이 켜져 있으면 replicas를 명시 안 함 (HPA가 관리)
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "order-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "order-service.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: app
+          # required = 필수 값 검증 (없으면 에러). image.repository는 환경마다 다르므로 강제
+          image: "{{ required "image.repository is required" .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http              # 이름 붙여두면 Service의 targetPort에서 참조 가능
+              containerPort: {{ .Values.service.targetPort }}
+            - name: metrics
+              containerPort: {{ .Values.service.metricsPort }}
+          env:
+            # values.yaml의 env: 맵을 순회하며 환경변수로 주입
+            {{- range $k, $v := .Values.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}   # quote = 항상 문자열로 (숫자 충돌 방지)
+            {{- end }}
+          # /healthz 는 Go 앱이 200 OK를 리턴하는 헬스체크 엔드포인트
+          readinessProbe:               # 트래픽 받을 준비됐나?
+            httpGet:
+              path: /healthz
+              port: http                # 위에서 이름 붙인 포트 참조
+            periodSeconds: 5
+          livenessProbe:                # 살아있나? (실패 시 재시작)
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10     # 부팅 시간 고려
+            periodSeconds: 10
+          resources:
+            # values.yaml의 resources 맵을 그대로 YAML로 변환 후 12칸 들여쓰기
+            {{- toYaml .Values.resources | nindent 12 }}

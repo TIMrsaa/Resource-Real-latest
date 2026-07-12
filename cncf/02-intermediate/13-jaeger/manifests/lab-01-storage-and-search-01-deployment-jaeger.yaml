@@ -1,0 +1,28 @@
+# Source: cncf/02-intermediate/13-jaeger/lab-01-storage-and-search.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: jaeger }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: jaeger } }
+  template:
+    metadata: { labels: { app: jaeger } }
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:1.60
+          env:
+            - { name: COLLECTOR_OTLP_ENABLED, value: "true" }
+            - { name: SPAN_STORAGE_TYPE, value: "memory" }
+            - { name: METRICS_STORAGE_TYPE, value: "prometheus" }
+          ports: [{ containerPort: 4317 }, { containerPort: 16686 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jaeger }
+spec:
+  selector: { app: jaeger }
+  ports:
+    - { name: otlp, port: 4317 }
+    - { name: ui, port: 16686 }

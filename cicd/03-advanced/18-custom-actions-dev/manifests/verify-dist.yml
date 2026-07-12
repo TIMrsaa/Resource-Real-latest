@@ -1,0 +1,24 @@
+# Source: cicd/03-advanced/18-custom-actions-dev/lab-02-publish-and-security.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: verify-dist
+on: [push, pull_request]
+permissions: { contents: read }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npx ncc build src/index.js -o dist
+      - name: dist가 src에서 재현되는가 (커밋된 것과 일치?)
+        run: |
+          if [ -n "$(git status --porcelain dist/)" ]; then
+            echo "🚨 dist가 src와 불일치 — 번들을 다시 커밋하세요"
+            git diff dist/ | head
+            exit 1
+          fi
+          echo "✅ dist가 src에서 재현됨 (소비자가 신뢰 가능)"

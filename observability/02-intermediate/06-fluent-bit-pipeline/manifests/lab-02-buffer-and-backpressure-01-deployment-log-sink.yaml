@@ -1,0 +1,22 @@
+# Source: observability/02-intermediate/06-fluent-bit-pipeline/lab-02-buffer-and-backpressure.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: log-sink, namespace: sink }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: log-sink } }
+  template:
+    metadata: { labels: { app: log-sink } }
+    spec:
+      containers:
+        - name: sink
+          image: hashicorp/http-echo
+          args: ["-listen=:8080", "-text=ok"]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: log-sink, namespace: sink }
+spec:
+  selector: { app: log-sink }
+  ports: [{ port: 8080 }]

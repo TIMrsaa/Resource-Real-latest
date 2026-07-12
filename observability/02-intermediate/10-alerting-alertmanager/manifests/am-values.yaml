@@ -1,0 +1,26 @@
+# Source: observability/02-intermediate/10-alerting-alertmanager/lab-02-alertmanager-routing.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+alertmanager:
+  config:
+    route:
+      receiver: slack-default
+      group_by: [alertname, job]
+      group_wait: 15s
+      group_interval: 1m
+      repeat_interval: 2h
+      routes:
+        - matchers: [severity = "page"]
+          receiver: pager                # 깨울 일 → 페이저
+        - matchers: [team = "commerce"]
+          receiver: slack-default        # 팀 채널
+    inhibit_rules:
+      - source_matchers: [alertname = "PaymentTargetMissing"]
+        target_matchers: [alertname = "PaymentHighErrorRate"]
+        equal: [job]                     # 타깃 소실이 울리면 에러율 알림은 침묵
+    receivers:
+      - name: pager
+        webhook_configs:
+          - url: http://hook-pager.receivers.svc:8080/
+      - name: slack-default
+        webhook_configs:
+          - url: http://hook-slack.receivers.svc:8080/

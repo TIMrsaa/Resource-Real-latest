@@ -1,0 +1,48 @@
+# Source: cicd/02-intermediate/06-gha-advanced/lab-01-reusable.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: reusable-ci
+on:
+  workflow_call:                        # ★ 이 트리거가 "호출당할 수 있음"을 선언
+    inputs:
+      python-version:
+        type: string
+        default: "3.12"
+      run-integration:
+        type: boolean
+        default: false
+    outputs:
+      tested-version:
+        value: ${{ jobs.test.outputs.version }}
+    # secrets: 은 필요할 때만 명시 선언 (inherit 금지 — theory §2)
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest              # ★ composite은 못 하는 것: 러너 선택
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./setup-python-app        # 같은 저장소의 composite을 잡 안에서 사용
+        with:
+          python-version: ${{ inputs.python-version }}
+      - id: v
+        run: echo "version=$(python -V | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - run: pytest -q -m "not quarantine" tests/ || echo "(테스트 없음 — 데모)"
+
+  integration:
+    if: inputs.run-integration          # ★ composite은 못 하는 것: 조건부 잡
+    runs-on: ubuntu-latest
+    services:                           # ★ composite은 못 하는 것: service container
+      postgres:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: test }
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+        ports: ["5432:5432"]
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "통합 테스트 (DB 준비됨)"

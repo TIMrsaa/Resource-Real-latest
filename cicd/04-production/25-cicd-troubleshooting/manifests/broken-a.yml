@@ -1,0 +1,13 @@
+# Source: cicd/04-production/25-cicd-troubleshooting/lab-02-game-day.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+name: broken-a
+on: [workflow_dispatch]
+permissions: { contents: read }
+jobs:
+  affected:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 변경된 파일 계산
+        run: |
+          git diff --name-only HEAD~1 || exit 1

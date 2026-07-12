@@ -1,0 +1,17 @@
+# Source: cncf/02-intermediate/17-flux/lab-02-image-automation-and-tenancy.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata: { name: podinfo, namespace: team-a }
+spec: { url: https://github.com/stefanprodan/podinfo, ref: { branch: master }, interval: 5m }
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata: { name: team-a-app, namespace: team-a }
+spec:
+  interval: 5m
+  path: ./kustomize
+  prune: true
+  sourceRef: { kind: GitRepository, name: podinfo }
+  serviceAccountName: reconciler        # ★ 이 SA의 RBAC를 넘을 수 없습니다
+  targetNamespace: team-a

@@ -1,0 +1,102 @@
+# =============================================================================
+# cluster.yaml — eksctl로 EKS 클러스터를 한방에 생성하는 ClusterConfig
+# =============================================================================
+# eksctl 이란?
+#   AWS가 만든 EKS 전용 CLI. 한 YAML로 VPC + EKS + NodeGroup + Addon을
+#   CloudFormation 스택으로 생성. 학습/PoC에 매우 편리.
+#   (실무 정식 운영은 Terraform 권장 — Part-3-15에서 다룸)
+#
+# 생성:  eksctl create cluster -f cluster.yaml
+#       (소요: 약 15~20분. 커피 한잔 ☕)
+# 삭제:  eksctl delete cluster -f cluster.yaml
+#       (반드시 잊지 말 것! 시간당 ~$0.10 + EC2 비용)
+#
+# 진행 확인:  AWS 콘솔 → CloudFormation → 스택 이벤트
+# =============================================================================
+
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+# ── 메타데이터 ────────────────────────────────────────────────────
+metadata:
+  name: eks-study               # 클러스터 이름. AWS 콘솔/CLI에서 식별자
+  region: ap-northeast-2        # 서울 리전
+  version: "1.35"               # K8s 버전. EKS 지원 버전 확인 필수
+                                # (2026-05 현재 표준 지원: 1.30~1.35, 14개월마다 EOL)
+                                # 1.35는 2026-01-28 EKS 출시 (In-Place Pod Resize GA 등)
+  tags:                         # 모든 생성 리소스에 붙는 AWS 태그
+    Project: eks-study          # 비용 추적용 (Cost Explorer에서 필터)
+    Environment: learning
+
+# ── IAM 설정 ──────────────────────────────────────────────────────
+iam:
+  withOIDC: true                # OIDC provider 활성화 (IRSA 사용에 필수)
+                                # IRSA = Pod이 IAM Role 빌리는 기능 (Part 2-07)
+  serviceAccounts:              # addons[].wellKnownPolicies 는 이 위치에 와야 함
+    - metadata:
+        name: ebs-csi-controller-sa
+        namespace: kube-system
+      wellKnownPolicies:
+        ebsCSIController: true  # ebs-csi-driver addon 이 사용할 IRSA Role 자동 생성
+
+# ── VPC 설정 ──────────────────────────────────────────────────────
+vpc:
+  cidr: 10.20.0.0/16            # VPC IP 대역 (65,536개 IP)
+                                # 다른 VPC와 겹치면 안됨 (peering 시)
+  nat:
+    gateway: Single             # NAT Gateway 1개만 (학습용 비용 절감)
+                                # Single  : ~$32/월 (단일 AZ, HA 안됨)
+                                # HighlyAvailable : AZ별 1개 (~$96/월, 운영 권장)
+                                # Disable : NAT 없음 (퍼블릭 노드만 가능)
+
+# ── 노드 그룹 (워커 노드) ─────────────────────────────────────────
+managedNodeGroups:              # AWS가 관리해주는 노드 그룹 (자동 패치 등)
+  - name: workers
+    instanceTypes:              # 여러 타입 → Spot 가용성 ↑
+      - t3.medium               # 2 vCPU, 4 GiB
+      - t3a.medium              # AMD 버전 (10% 저렴)
+    spot: true                  # Spot 사용 (최대 90% 할인, 2분 회수 통보)
+                                # 학습/내결함성 워크로드에 적합
+                                # 운영의 stateful은 on-demand 권장
+    desiredCapacity: 2          # 시작 시 2개
+    minSize: 0                  # 0까지 줄일 수 있음 (Karpenter면 0이 기본)
+    maxSize: 6                  # 최대 6개까지 자동 확장
+    volumeSize: 30              # 노드 디스크 30 GiB (시스템 + 컨테이너 이미지)
+    volumeType: gp3
+    privateNetworking: true     # 노드는 private subnet에 (보안 권장)
+                                # false 면 public IP 부여 (NAT 비용 절감 시)
+    labels:                     # 노드에 K8s 라벨 부여
+      workload-type: general    # nodeSelector로 Pod이 이 노드 고를 수 있게
+
+    iam:
+      withAddonPolicies:        # 노드 IAM Role에 정책 자동 부착
+        ebs: true               # EBS CSI 드라이버용 (PV 동작에 필수)
+        cloudWatch: true        # CloudWatch에 로그/메트릭 전송
+        autoScaler: true        # Cluster Autoscaler용 (Karpenter면 불필요)
+        externalDNS: false      # Route53 자동 등록 안 씀
+        certManager: false      # cert-manager 안 씀
+
+# ── EKS Addon (AWS가 버전 관리해주는 부가 컴포넌트) ──────────────
+addons:
+  - name: vpc-cni               # Pod에 VPC IP 직접 할당 (EKS 핵심)
+    version: latest
+  - name: coredns               # 클러스터 내 DNS (svc 이름 해석)
+    version: latest
+  - name: kube-proxy            # Service IP → Pod IP 라우팅
+    version: latest
+  - name: aws-ebs-csi-driver    # PV로 EBS 동적 프로비저닝
+    version: latest
+    serviceAccountRoleARN: ""   # iam.serviceAccounts[0]에서 자동 생성된 Role 이 사용됨
+
+# ── CloudWatch 로깅 (컨트롤 플레인 로그) ─────────────────────────
+cloudWatch:
+  clusterLogging:
+    enableTypes:                # 어떤 종류의 로그를 CloudWatch로 보낼지
+      - api                     # API Server 호출 로그
+      - audit                   # 감사 로그 (누가 뭐 했나)
+      - authenticator           # IAM 인증 로그
+      - controllerManager
+      - scheduler
+                                # 비용: 인입량 기준 과금. 학습 시 7일 보관
+    logRetentionInDays: 7       # 7일 후 자동 삭제 (학습 비용 절감)
+                                # 운영: 30~90일 권장 (감사 추적)

@@ -1,0 +1,26 @@
+# Source: observability/01-beginner/04-traces-basics/lab-02-broken-propagation.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: v1
+kind: Pod
+metadata: { name: svc-c }
+spec:
+  containers:
+    - name: c
+      image: busybox
+      command: ["sh","-c"]
+      args:
+        - |
+          while true; do
+            req=$(nc -l -p 8080 -w 5 2>/dev/null | head -20) || continue;
+            tp=$(echo "$req" | grep -i "^traceparent:" | tr -d "\r" | awk '{print $2}');
+            if [ -z "$tp" ]; then
+              # ★ 헤더가 없으면? 새 trace를 시작할 수밖에 (고아)
+              trace_id=$(head -c16 /dev/urandom | od -An -tx1 | tr -d " \n");
+              parent="null(orphan!)";
+            else
+              trace_id=$(echo "$tp" | cut -d- -f2); parent=$(echo "$tp" | cut -d- -f3);
+            fi
+            echo "{\"svc\":\"C\",\"trace_id\":\"$trace_id\",\"parent\":\"$parent\",\"name\":\"C: work\"}";
+          done

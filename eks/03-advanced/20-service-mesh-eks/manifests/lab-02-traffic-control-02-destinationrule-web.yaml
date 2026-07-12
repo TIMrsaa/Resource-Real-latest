@@ -1,0 +1,20 @@
+# Source: eks/03-advanced/20-service-mesh-eks/lab-02-traffic-control.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata: { name: web, namespace: meshlab }
+spec:
+  host: web
+  subsets:
+  - { name: v1, labels: { version: v1 } }
+  - { name: v2, labels: { version: v2 } }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: web, namespace: meshlab }
+spec:
+  hosts: [web]
+  http:
+  - route:
+    - { destination: { host: web, subset: v1 }, weight: 90 }
+    - { destination: { host: web, subset: v2 }, weight: 10 }

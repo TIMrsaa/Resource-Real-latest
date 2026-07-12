@@ -1,0 +1,21 @@
+# Source: cicd/02-intermediate/10-codebuild-deep/lab-02-vpc-and-deploy.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+version: 0.2
+env:
+  variables:
+    ECR: ACCOUNT.dkr.ecr.REGION.amazonaws.com/cb-lab-app
+phases:
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin ${ECR%/*}
+      - TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-manual}
+  build:
+    commands:
+      - docker build -t $ECR:${TAG:0:12} .
+  post_build:
+    commands:
+      - docker push $ECR:${TAG:0:12}
+      - echo "배포 참조 - 다이제스트(04):"
+      - aws ecr describe-images --repository-name cb-lab-app --region $AWS_DEFAULT_REGION --image-ids imageTag=${TAG:0:12} --query 'imageDetails[0].imageDigest' --output text

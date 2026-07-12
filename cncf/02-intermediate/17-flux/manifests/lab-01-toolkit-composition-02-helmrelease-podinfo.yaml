@@ -1,0 +1,16 @@
+# Source: cncf/02-intermediate/17-flux/lab-01-toolkit-composition.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata: { name: podinfo, namespace: env-a }
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: podinfo
+      version: "6.x"
+      sourceRef: { kind: HelmRepository, name: podinfo-helm, namespace: flux-system }
+  values:
+    replicaCount: 2
+  install: { remediation: { retries: 2 } }
+  upgrade: { remediation: { retries: 2, remediateLastFailure: true } }

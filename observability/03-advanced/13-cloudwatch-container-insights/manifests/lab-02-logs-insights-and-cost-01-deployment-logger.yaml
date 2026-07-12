@@ -1,0 +1,33 @@
+# Source: observability/03-advanced/13-cloudwatch-container-insights/lab-02-logs-insights-and-cost.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logger
+  labels: { app: logger }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: logger }
+  template:
+    metadata:
+      labels: { app: logger }
+    spec:
+      containers:
+        - name: logger
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              while true; do
+                if [ $((RANDOM % 4)) -eq 0 ]; then
+                  echo "{\"level\":\"error\",\"event\":\"pg_timeout\",\"user_id\":$((RANDOM%50)),\"retries\":3}";
+                else
+                  echo "{\"level\":\"info\",\"event\":\"payment_ok\",\"user_id\":$((RANDOM%50))}";
+                fi;
+                echo "GET /healthz 200";
+                sleep 0.5;
+              done

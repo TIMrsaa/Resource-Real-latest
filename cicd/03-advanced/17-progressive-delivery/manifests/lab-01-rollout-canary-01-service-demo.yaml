@@ -1,0 +1,33 @@
+# Source: cicd/03-advanced/17-progressive-delivery/lab-01-rollout-canary.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata: { name: demo }
+spec:
+  replicas: 10
+  selector: { matchLabels: { app: demo } }
+  template:
+    metadata: { labels: { app: demo } }
+    spec:
+      containers:
+      - name: app
+        image: ghcr.io/stefanprodan/podinfo:6.7.0    # 시작 버전
+        ports: [{ containerPort: 9898 }]
+        resources: { requests: { cpu: 50m, memory: 32Mi } }
+  strategy:
+    canary:                          # ★ 카나리 네이티브 (11의 replica 조작이 1급으로)
+      steps:
+        - setWeight: 10              # 10%
+        - pause: { duration: 30s }
+        - setWeight: 30
+        - pause: {}                  # 무한 — 수동 승격 대기
+        - setWeight: 60
+        - pause: { duration: 30s }
+        - setWeight: 100
+---
+apiVersion: v1
+kind: Service
+metadata: { name: demo, namespace: pdlab }
+spec:
+  selector: { app: demo }
+  ports: [{ port: 80, targetPort: 9898 }]

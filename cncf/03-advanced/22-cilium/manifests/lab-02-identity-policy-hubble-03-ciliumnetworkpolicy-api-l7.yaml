@@ -1,0 +1,14 @@
+# Source: cncf/03-advanced/22-cilium/lab-02-identity-policy-hubble.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: { name: api-l7, namespace: demo }
+spec:
+  endpointSelector: { matchLabels: { app: api } }
+  ingress:
+    - fromEndpoints: [{ matchLabels: { app: frontend } }]
+      toPorts:
+        - ports: [{ port: "80", protocol: TCP }]
+          rules:
+            http:
+              - { method: "GET", path: "/$" }        # ★ GET / 만 허용

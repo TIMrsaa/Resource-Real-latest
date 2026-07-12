@@ -1,0 +1,37 @@
+# Source: cicd/01-beginner/05-testing-in-ci/lab-02-flaky-quarantine.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: flaky-detect
+on:
+  schedule: [{ cron: "0 18 * * *" }]      # 야간 (theory §6의 배치)
+  workflow_dispatch:
+permissions: { contents: read, issues: write }
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements-dev.txt
+
+      - name: 같은 커밋을 10회 — 결과가 갈리는 테스트 색출
+        id: detect
+        run: |
+          fails=0
+          for i in $(seq 1 10); do
+            pytest -q -m "not quarantine" tests/ >/dev/null 2>&1 || fails=$((fails+1))
+          done
+          echo "fails=$fails" >> "$GITHUB_OUTPUT"
+          echo "10회 중 $fails회 실패"
+
+      - name: flaky 발견 시 이슈 생성 (추적 — 무시가 아닙니다)
+        if: steps.detect.outputs.fails != '0' && steps.detect.outputs.fails != '10'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh issue create \
+            --title "flaky 탐지: 10회 중 ${{ steps.detect.outputs.fails }}회 실패" \
+            --body "같은 커밋(${GITHUB_SHA::8})에서 결과가 갈립니다. 격리(@pytest.mark.quarantine) 후 원인 조사 필요. 원천 체크: 시간/순서/동시성/외부의존/자원" \
+            --label flaky

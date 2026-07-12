@@ -1,0 +1,51 @@
+# =============================================================================
+# inflate-deployment.yaml — Karpenter 시연용 "더미 부풀리기" Deployment
+# =============================================================================
+# 목적:
+#   "Pod 늘리면 Karpenter가 노드를 띄우는가?" 를 눈으로 확인
+#
+# 동작 시나리오:
+#   1) replicas=0 으로 적용 (Pod 없음, 노드 추가 X)
+#   2) kubectl scale deploy inflate --replicas=5
+#   3) 5개 Pod가 Pending 상태 → 기존 노드 자원 부족
+#   4) Karpenter 컨트롤러가 감지 → 적절한 EC2 인스턴스 선택 → 띄움
+#   5) 30~60초 후 노드 Ready, Pod 자동 스케줄링
+#   6) kubectl scale deploy inflate --replicas=0
+#   7) 30초 후 (consolidateAfter) 빈 노드 자동 종료
+#
+# 'inflate'는 Karpenter 공식 데모에 자주 등장하는 이름 (풍선 부풀리듯 키운다는 의미)
+#
+# pause 이미지란?
+#   "아무것도 안 하고 sleep만" 하는 K8s 전용 최소 이미지 (~700KB)
+#   리소스 시연에 부담 없음
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inflate
+spec:
+  replicas: 0                       # 시작은 0. kubectl scale 로 늘리며 시연
+  selector:
+    matchLabels: { app: inflate }
+  template:
+    metadata:
+      labels: { app: inflate }
+    spec:
+      terminationGracePeriodSeconds: 0    # 종료 시 즉시 죽임 (시연 빠르게)
+                                          # 운영: 기본 30초, 트래픽 빠지는 시간 필요
+      nodeSelector:
+        managed-by: karpenter           # ← 핵심! Karpenter 노드에만 스케줄
+                                        # 기존 NodeGroup 노드엔 안 감
+      containers:
+        - name: pause
+          image: public.ecr.aws/eks-distro/kubernetes/pause:3.7
+                                        # K8s 표준 pause 이미지 (그냥 잠만 잠)
+          resources:
+            requests:                   # 의도적으로 큰 요청
+              cpu: 1                    # 1 vCPU
+              memory: 1.5Gi             # 1.5 GiB
+                                        # → t3.medium(2 vCPU, 4Gi) 한 대당
+                                        #   기껏해야 1~2 Pod이 들어감
+                                        # → replicas 5개 = 노드 3~5대 필요
+                                        # → 노드 추가 트리거됨

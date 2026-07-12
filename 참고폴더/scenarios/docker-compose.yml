@@ -1,0 +1,45 @@
+services:
+  localstack:
+    image: localstack/localstack:3
+    environment: [SERVICES=sqs]
+    ports: ["4566:4566"]
+
+  kafka:
+    image: bitnami/kafka:3.7
+    environment:
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+    ports: ["9092:9092"]
+
+  order-service:
+    build: { context: ., dockerfile: order-service/Dockerfile }
+    ports: ["8080:8080", "9090:9090"]
+
+  payment-service:
+    build: { context: ., dockerfile: payment-service/Dockerfile }
+    environment:
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - SQS_QUEUE_URL=http://localstack:4566/000000000000/payments
+    depends_on: [localstack]
+
+  user-service:
+    build: { context: ., dockerfile: user-service/Dockerfile }
+    ports: ["50051:50051"]
+
+  notification-service:
+    build: { context: ., dockerfile: notification-service/Dockerfile }
+    environment:
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_TOPIC=notifications
+    depends_on: [kafka]
+
+  frontend:
+    build: { context: ., dockerfile: frontend/Dockerfile }
+    ports: ["8081:8080"]

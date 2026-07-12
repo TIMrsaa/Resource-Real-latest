@@ -1,0 +1,19 @@
+# Source: cicd/03-advanced/17-progressive-delivery/lab-02-analysis-autorollback.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata: { name: success-rate }
+spec:
+  metrics:
+    - name: success-rate
+      interval: 30s
+      count: 4                              # 4번 측정
+      successCondition: "result[0] >= 0.90" # 성공률 90% 이상 (eks 13의 SLI)
+      failureLimit: 2                        # 2번 미달하면 롤백
+      provider:
+        prometheus:
+          address: http://prometheus-server.monitoring.svc
+          query: |
+            sum(rate(http_requests_total{namespace="pdlab",status!~"5.."}[1m]))
+            /
+            sum(rate(http_requests_total{namespace="pdlab"}[1m]))

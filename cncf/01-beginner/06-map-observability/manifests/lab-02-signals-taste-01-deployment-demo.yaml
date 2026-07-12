@@ -1,0 +1,39 @@
+# Source: cncf/01-beginner/06-map-observability/lab-02-signals-taste.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo
+  labels: { app: demo }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: demo }
+  template:
+    metadata:
+      labels: { app: demo }
+    spec:
+      containers:
+        - name: example-app
+          image: quay.io/brancz/prometheus-example-app:v0.3.0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo
+spec:
+  selector: { app: demo }
+  ports:
+    - port: 8080
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl
+  labels: { run: curl }
+spec:
+  restartPolicy: Never
+  containers:
+    - name: curl
+      image: busybox
+      command: ["sh", "-c", "wget -qO- demo:8080/metrics | head -5; sleep 3600"]

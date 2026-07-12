@@ -1,0 +1,43 @@
+# Source: observability/04-production/21-slo-sli-error-budget/lab-01-sli-slo-rules.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: payment-slo
+  namespace: shop
+  labels: { release: monitoring }
+spec:
+  groups:
+    - name: slo.sli
+      interval: 30s
+      rules:
+        # 에러 비율의 창 계층 (번레이트의 재료 — lab-02)
+        - record: slo:payment_error_ratio:rate5m
+          expr: |
+            sum(rate(http_requests_total{namespace="shop",code=~"5.."}[5m]))
+            / sum(rate(http_requests_total{namespace="shop"}[5m]))
+        - record: slo:payment_error_ratio:rate30m
+          expr: |
+            sum(rate(http_requests_total{namespace="shop",code=~"5.."}[30m]))
+            / sum(rate(http_requests_total{namespace="shop"}[30m]))
+        - record: slo:payment_error_ratio:rate1h
+          expr: |
+            sum(rate(http_requests_total{namespace="shop",code=~"5.."}[1h]))
+            / sum(rate(http_requests_total{namespace="shop"}[1h]))
+        - record: slo:payment_error_ratio:rate6h
+          expr: |
+            sum(rate(http_requests_total{namespace="shop",code=~"5.."}[6h]))
+            / sum(rate(http_requests_total{namespace="shop"}[6h]))
+    - name: slo.budget
+      interval: 60s
+      rules:
+        # 기간(실습: 1일) 누적 실패와 버짓 잔량 비율
+        - record: slo:payment_errors:increase1d
+          expr: sum(increase(http_requests_total{namespace="shop",code=~"5.."}[1d]))
+        - record: slo:payment_requests:increase1d
+          expr: sum(increase(http_requests_total{namespace="shop"}[1d]))
+        # 버짓 사용률 = 누적 실패 / (허용 실패율 0.02 × 전체)
+        - record: slo:payment_budget_used_ratio:1d
+          expr: |
+            slo:payment_errors:increase1d
+            / (0.02 * slo:payment_requests:increase1d)

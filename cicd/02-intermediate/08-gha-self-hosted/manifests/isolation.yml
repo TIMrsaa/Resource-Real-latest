@@ -1,0 +1,27 @@
+# Source: cicd/02-intermediate/08-gha-self-hosted/lab-02-isolation-and-iam.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: isolation-test
+on: workflow_dispatch
+jobs:
+  # 잡 A: 파일과 "자격증명"을 남깁니다
+  job-a:
+    runs-on: eks-runners
+    steps:
+      - run: |
+          echo "SECRET_FROM_A=leaked" > /tmp/creds.txt
+          echo "job-a가 /tmp/creds.txt를 남겼다 on $(hostname)"
+
+  # 잡 B: A의 흔적을 찾습니다
+  job-b:
+    runs-on: eks-runners
+    needs: job-a
+    steps:
+      - run: |
+          echo "job-b on $(hostname)"
+          if [ -f /tmp/creds.txt ]; then
+            echo "🚨 오염: $(cat /tmp/creds.txt)"
+          else
+            echo "✅ 격리됨: A의 파일이 없습니다 (다른 Pod입니다)"
+          fi

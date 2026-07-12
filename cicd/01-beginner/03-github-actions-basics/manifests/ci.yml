@@ -1,0 +1,57 @@
+# Source: cicd/01-beginner/03-github-actions-basics/lab-02-ci-gate.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: ci                       # ★ 이 이름이 브랜치 보호의 필수 검사와 매칭됩니다
+
+on:
+  pull_request:                # 포크 PR도 안전하게 (시크릿 없음 — theory §3)
+  push:
+    branches: [main]
+
+concurrency:                   # 새 push가 오면 이전 실행 취소 (러너 절약)
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read               # 최소 권한
+
+jobs:
+  # ── 원칙 ①: 싸고 자주 실패하는 것을 먼저, 그리고 병렬로 ──
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip                       # 의존성 캐시 (러너는 매번 새 VM!)
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check app tests
+      - run: ruff format --check app tests
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false                     # 한 버전 실패해도 나머지 결과를 봅니다
+      matrix:
+        python: ["3.11", "3.12", "3.13"]   # 매트릭스 — 잡이 3개로 늘어납니다
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q tests/
+
+  # ── 원칙 ②: 게이트 하나로 수렴 (브랜치 보호가 참조할 단일 검사) ──
+  ci:
+    if: always()
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 모든 선행 잡이 성공했는가
+        run: |
+          echo "lint=${{ needs.lint.result }} test=${{ needs.test.result }}"
+          [ "${{ needs.lint.result }}" = "success" ] && [ "${{ needs.test.result }}" = "success" ]

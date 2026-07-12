@@ -1,0 +1,21 @@
+# Source: eks/03-advanced/15-custom-metrics-hpa/lab-01-prometheus-adapter.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: podinfo-rps, namespace: scalelab }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: podinfo }
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  - type: Pods
+    pods:
+      metric: { name: http_requests_per_second }
+      target: { type: AverageValue, averageValue: "50" }   # ← Pod당 목표 (13에서 산정)
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies: [{ type: Percent, value: 100, periodSeconds: 30 }]
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies: [{ type: Pods, value: 1, periodSeconds: 60 }]

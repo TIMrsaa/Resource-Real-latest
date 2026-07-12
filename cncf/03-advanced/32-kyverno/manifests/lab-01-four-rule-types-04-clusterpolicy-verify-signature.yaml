@@ -1,0 +1,19 @@
+# Source: cncf/03-advanced/32-kyverno/lab-01-four-rule-types.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: verify-signature }
+spec:
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: check-cosign
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      verifyImages:
+        - imageReferences: ["ghcr.io/myorg/*"]
+          failureAction: Audit          # 실습이라 Audit (verifyImages도 규칙 단위)
+          attestors:
+            - entries:
+                - keyless:
+                    subject: "https://github.com/myorg/*"
+                    issuer: "https://token.actions.githubusercontent.com"
+                    rekor: { url: https://rekor.sigstore.dev }

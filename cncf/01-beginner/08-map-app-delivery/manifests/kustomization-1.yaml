@@ -1,0 +1,15 @@
+# Source: cncf/01-beginner/08-map-app-delivery/lab-02-helm-vs-kustomize.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+resources: [../../base]
+replicas:
+  - name: app
+    count: 3
+images:
+  - name: nginx
+    newTag: "1.27"
+patches:
+  - target: { kind: Deployment, name: app }
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value: { limits: { cpu: 500m, memory: 256Mi } }

@@ -1,0 +1,28 @@
+# Source: cncf/01-beginner/07-map-security/lab-02-admission-and-runtime.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: baseline-hardening }
+spec:
+  rules:
+    - name: no-latest-tag
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      validate:
+        failureAction: Enforce
+        message: "latest 태그 금지 — 다이제스트 또는 명시 태그 (cicd 04)"
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
+    - name: require-non-root
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      validate:
+        failureAction: Enforce
+        message: "runAsNonRoot: true 필요"
+        pattern:
+          spec:
+            =(securityContext):
+              =(runAsNonRoot): "true"
+            containers:
+              - =(securityContext):
+                  =(runAsNonRoot): "true"

@@ -1,0 +1,71 @@
+# =============================================================================
+# cpu-scaler.yaml — KEDA CPU 트리거 기반 ScaledObject 데모
+# =============================================================================
+# KEDA란?
+#   K8s 기본 HPA를 확장한 이벤트 기반 오토스케일러.
+#   HPA는 CPU/메모리만 보지만, KEDA는 60+ 트리거 지원
+#   (SQS, Kafka, Prometheus, Redis 큐 길이, S3 객체 수, 크론 등)
+#
+# 동작:
+#   ScaledObject (이 파일)
+#       ↓ KEDA가 내부적으로
+#   HPA + ExternalMetric 자동 생성
+#       ↓ 주기적으로 (pollingInterval)
+#   트리거 평가 → replicas 조절
+#
+# 이 파일은 "가장 단순한 시연": stress 컨테이너로 CPU 부하 → KEDA가 Pod 증가
+#
+# 시연:
+#   kubectl apply -f cpu-scaler.yaml
+#   kubectl get hpa -w               # KEDA가 만든 HPA 보기
+#   kubectl get pods -w              # 5분간 Pod 늘어남 (stress 종료까지)
+# =============================================================================
+
+# ── stress 부하 발생기 Deployment ────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-demo
+spec:
+  replicas: 1                      # 시작은 1개
+  selector:
+    matchLabels: {app: cpu-demo}
+  template:
+    metadata:
+      labels: {app: cpu-demo}
+    spec:
+      nodeSelector: {managed-by: karpenter}    # Karpenter 노드 사용
+      containers:
+        - name: stress
+          image: progrium/stress           # 일부러 CPU 부하 주는 도구
+          args: ["--cpu", "1", "--timeout", "300s"]
+                                           # CPU 1코어 풀로 사용, 5분간
+          resources:
+            requests:
+              cpu: 100m                    # KEDA Utilization 분모
+              memory: 64Mi
+            limits:
+              cpu: 200m                    # 200m = 0.2 vCPU 한도
+              memory: 128Mi
+
+---
+# ── KEDA ScaledObject (스케일링 정책) ────────────────────────────
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: cpu-demo
+spec:
+  scaleTargetRef:
+    name: cpu-demo                 # 어떤 Deployment를 스케일링?
+                                   # (kind 미지정 시 기본 Deployment)
+  minReplicaCount: 1               # 최소 Pod 수 (이 아래로 안 내려감)
+  maxReplicaCount: 10              # 최대 Pod 수
+  pollingInterval: 15              # 15초마다 트리거 평가
+  cooldownPeriod: 60               # scale-in (감소) 안정화 시간 60초
+                                   # 부하 사라져도 60초 더 유지 (튕김 방지)
+  triggers:
+    - type: cpu                    # 트리거 종류 (cpu/memory/cron/sqs/kafka 등)
+      metricType: Utilization      # Utilization (request 대비 %) / AverageValue (절대값)
+      metadata:
+        value: "50"                # 50% 이상이면 스케일 아웃 트리거
+                                   # = 평균 CPU가 requests(100m)의 50% (=50m) 넘으면

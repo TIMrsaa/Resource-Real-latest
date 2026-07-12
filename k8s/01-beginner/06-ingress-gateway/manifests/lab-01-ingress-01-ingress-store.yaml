@@ -1,0 +1,15 @@
+# Source: k8s/01-beginner/06-ingress-gateway/lab-01-ingress.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: store
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service: { name: store-v1, port: { number: 80 } }

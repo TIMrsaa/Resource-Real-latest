@@ -1,0 +1,13 @@
+# Source: cncf/03-advanced/24-istio/lab-01-istiod-and-traffic.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client
+  namespace: demo
+  labels: { run: client }
+spec:
+  containers:
+    - name: client
+      image: curlimages/curl
+      command: ["sleep", "3600"]

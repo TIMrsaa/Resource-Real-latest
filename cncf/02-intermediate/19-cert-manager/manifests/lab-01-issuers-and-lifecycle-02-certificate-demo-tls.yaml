@@ -1,0 +1,13 @@
+# Source: cncf/02-intermediate/19-cert-manager/lab-01-issuers-and-lifecycle.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: { name: demo-tls, namespace: apps }
+spec:
+  secretName: demo-tls
+  issuerRef: { name: selfsigned, kind: ClusterIssuer }
+  commonName: demo.internal
+  dnsNames: ["demo.internal", "demo.apps.svc"]
+  duration: 24h                # ★ 짧게 — 갱신을 관찰하기 위해
+  renewBefore: 23h             # ★ 발급 1시간 후 갱신 (실험용 극단값)
+  privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }

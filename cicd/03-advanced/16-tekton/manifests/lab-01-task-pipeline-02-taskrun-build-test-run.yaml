@@ -1,0 +1,8 @@
+# Source: cicd/03-advanced/16-tekton/lab-01-task-pipeline.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: tekton.dev/v1
+kind: TaskRun
+metadata: { name: build-test-run }
+spec:
+  taskRef: { name: build-test }
+  params: [{ name: message, value: "from tekton" }]

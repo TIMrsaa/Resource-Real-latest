@@ -1,0 +1,8 @@
+# Source: cncf/02-intermediate/15-helm-internals/lab-01-render-and-release.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "demo.fullname" . }}-config
+data:
+  enabled: {{ .Values.config.logLevel }}

@@ -1,0 +1,29 @@
+# Source: k8s/03-advanced/23-admission-webhooks/lab-02-webhook.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: demo-webhook, namespace: webhook }
+spec:
+  replicas: 1                      # 일부러 1개 — 장애 실험용 (실무는 2+!)
+  selector: { matchLabels: { app: demo-webhook } }
+  template:
+    metadata: { labels: { app: demo-webhook, team: platform } }
+    spec:
+      volumes:
+      - { name: certs, secret: { secretName: webhook-tls } }
+      - { name: code, configMap: { name: webhook-code } }
+      containers:
+      - name: server
+        image: public.ecr.aws/docker/library/python:3.13-slim
+        command: ["python", "/code/webhook.py"]
+        ports: [{ containerPort: 8443 }]
+        volumeMounts:
+        - { name: certs, mountPath: /certs }
+        - { name: code, mountPath: /code }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: demo-webhook, namespace: webhook }
+spec:
+  selector: { app: demo-webhook }
+  ports: [{ port: 443, targetPort: 8443 }]

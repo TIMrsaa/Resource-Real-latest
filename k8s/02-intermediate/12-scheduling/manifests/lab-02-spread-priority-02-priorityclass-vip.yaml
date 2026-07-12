@@ -1,0 +1,11 @@
+# Source: k8s/02-intermediate/12-scheduling/lab-02-spread-priority.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata: { name: vip }
+value: 100000
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata: { name: peasant }
+value: 100

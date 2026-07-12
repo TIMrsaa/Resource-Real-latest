@@ -1,0 +1,59 @@
+# Source: observability/02-intermediate/12-loki-tempo-stack/lab-01-loki-tempo-setup.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata: { name: default, namespace: shop }
+spec:
+  exporter: { endpoint: http://gateway-collector.observability:4318 }
+  propagators: [tracecontext]
+  sampler: { type: parentbased_traceidratio, argument: "1.0" }
+  python:
+    env: [{ name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: app-code, namespace: shop }
+data:
+  app.py: |
+    from flask import Flask
+    from opentelemetry import trace
+    import json, time, random, sys
+    app = Flask(__name__)
+    def log(level, event, **kw):
+        ctx = trace.get_current_span().get_span_context()
+        rec = {"level": level, "event": event,
+               "trace_id": format(ctx.trace_id, "032x"),   # ★ 02의 규약!
+               **kw}
+        print(json.dumps(rec)); sys.stdout.flush()
+    @app.route("/pay")
+    def pay():
+        if random.random() < 0.3:
+            time.sleep(1.2)                     # 느린 경로 (PG timeout 흉내)
+            log("error", "pg_timeout", retries=3)
+            return {"status": "fail"}, 502
+        time.sleep(0.05)
+        log("info", "payment_ok")
+        return {"status": "ok"}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: payment, namespace: shop }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: payment } }
+  template:
+    metadata:
+      labels: { app: payment }
+      annotations: { instrumentation.opentelemetry.io/inject-python: "true" }
+    spec:
+      containers:
+        - name: app
+          image: python:3.12-slim
+          command: ["sh","-c","pip install flask -q && flask --app /code/app.py run --host=0.0.0.0 --port=8080"]
+          volumeMounts: [{ name: code, mountPath: /code }]
+      volumes: [{ name: code, configMap: { name: app-code } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: payment, namespace: shop }
+spec: { selector: { app: payment }, ports: [{ port: 8080 }] }

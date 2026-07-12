@@ -1,0 +1,10 @@
+# Source: cncf/01-beginner/04-map-networking/lab-02-cilium-taste.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: web-lockdown }
+spec:
+  podSelector: { matchLabels: { app: web } }
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{ podSelector: { matchLabels: { role: allowed } } }]

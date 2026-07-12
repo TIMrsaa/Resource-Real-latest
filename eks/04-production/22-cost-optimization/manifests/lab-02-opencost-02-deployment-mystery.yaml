@@ -1,0 +1,21 @@
+# Source: eks/04-production/22-cost-optimization/lab-02-opencost.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mystery
+  namespace: rogue
+  labels: { app: mystery }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mystery }
+  template:
+    metadata:
+      labels: { app: mystery }
+    spec:
+      containers:
+        - name: podinfo
+          image: ghcr.io/stefanprodan/podinfo:6.7.1
+          resources:
+            requests: { cpu: 500m, memory: 256Mi }

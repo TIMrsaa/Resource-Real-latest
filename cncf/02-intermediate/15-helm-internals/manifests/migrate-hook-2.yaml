@@ -1,0 +1,10 @@
+# Source: cncf/02-intermediate/15-helm-internals/lab-02-hooks-and-gitops.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "demo.fullname" . }}-hookcm
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    # 🐛 hook-delete-policy 없음!
+data: { note: "이 리소스는 릴리스의 일부가 아니다" }

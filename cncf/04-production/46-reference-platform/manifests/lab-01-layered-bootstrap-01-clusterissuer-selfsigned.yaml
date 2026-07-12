@@ -1,0 +1,7 @@
+# Source: cncf/04-production/46-reference-platform/lab-01-layered-bootstrap.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata: { name: selfsigned }
+spec:
+  selfSigned: {}

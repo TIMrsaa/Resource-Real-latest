@@ -1,0 +1,13 @@
+# Source: cncf/03-advanced/24-istio/lab-01-istiod-and-traffic.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: reviews }
+spec:
+  hosts: [reviews]
+  http:
+    - match: [{ headers: { x-user: { exact: tester } } }]   # 특정 헤더는 v2로
+      route: [{ destination: { host: reviews, subset: v2 } }]
+    - route: [{ destination: { host: reviews, subset: v1 } }]  # 나머지는 v1
+      mirror: { host: reviews, subset: v2 }                    # ★ v2로 미러링(응답 무시)
+      mirrorPercentage: { value: 100 }

@@ -1,0 +1,19 @@
+# Source: k8s/02-intermediate/17-helm-deep/lab-02-release-ops.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "webapp.fullname" . }}-migrate
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: migrate
+        image: public.ecr.aws/docker/library/busybox:stable
+        command: ["sh", "-c", "echo 'migrating database to {{ .Values.environment }}...'; sleep 5; echo done"]

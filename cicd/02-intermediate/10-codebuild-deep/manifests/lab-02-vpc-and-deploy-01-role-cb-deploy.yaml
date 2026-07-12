@@ -1,0 +1,15 @@
+# Source: cicd/02-intermediate/10-codebuild-deep/lab-02-vpc-and-deploy.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: { name: cb-deploy, namespace: default }
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get","list","create","update","patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: { name: cb-deploy, namespace: default }
+subjects: [{ kind: Group, name: cb-deployers, apiGroup: rbac.authorization.k8s.io }]
+roleRef: { kind: Role, name: cb-deploy, apiGroup: rbac.authorization.k8s.io }

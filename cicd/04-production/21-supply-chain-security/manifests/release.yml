@@ -1,0 +1,35 @@
+# Source: cicd/04-production/21-supply-chain-security/lab-01-sign-and-verify.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: release
+on: [push, workflow_dispatch]
+permissions:
+  contents: read
+  packages: write
+  id-token: write          # ★ 07의 그 권한 — OIDC 토큰이 서명 신원이 됩니다
+jobs:
+  build-sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 빌드 + push (다이제스트 확보 — 04)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          tags: ghcr.io/${{ github.repository }}:v1
+          push: true
+          provenance: true            # 19의 provenance — SLSA L1 재료
+      - uses: sigstore/cosign-installer@v3
+      - name: keyless 서명 (키 없음!)
+        run: cosign sign --yes ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }}
+        # 내부에서: OIDC 토큰 → Fulcio 인증서(10분) → 서명 → Rekor 기록 (theory §3)
+      - name: 다이제스트 출력 (검증용)
+        run: echo "DIGEST=${{ steps.build.outputs.digest }}"

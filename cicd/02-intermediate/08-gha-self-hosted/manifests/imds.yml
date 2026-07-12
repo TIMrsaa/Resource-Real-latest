@@ -1,0 +1,21 @@
+# Source: cicd/02-intermediate/08-gha-self-hosted/lab-02-isolation-and-iam.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: imds-check
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: eks-runners
+    steps:
+      - name: IMDS 접근 시도 (막혀 있어야 합니다)
+        run: |
+          TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+            -H "X-aws-ec2-metadata-token-ttl-seconds: 60" --max-time 3 || echo "")
+          if [ -z "$TOKEN" ]; then
+            echo "✅ IMDS 차단됨 (hop limit=1 또는 NetworkPolicy)"
+          else
+            ROLE=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+              http://169.254.169.254/latest/meta-data/iam/security-credentials/ --max-time 3)
+            echo "🚨 노드 역할 노출: $ROLE"
+          fi

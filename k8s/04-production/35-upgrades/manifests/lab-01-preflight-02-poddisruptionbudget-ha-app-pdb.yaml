@@ -1,0 +1,8 @@
+# Source: k8s/04-production/35-upgrades/lab-01-preflight.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: ha-app-pdb }
+spec:
+  maxUnavailable: 1              # 3개 중 동시에 1개까지만 부재 허용
+  selector: { matchLabels: { app: ha-app } }

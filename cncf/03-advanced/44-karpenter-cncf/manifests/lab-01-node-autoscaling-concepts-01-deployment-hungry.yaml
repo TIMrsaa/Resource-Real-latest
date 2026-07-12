@@ -1,0 +1,19 @@
+# Source: cncf/03-advanced/44-karpenter-cncf/lab-01-node-autoscaling-concepts.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hungry
+spec:
+  replicas: 5
+  selector: { matchLabels: { app: hungry } }
+  template:
+    metadata: { labels: { app: hungry } }
+    spec:
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: "2"          # 각 Pod가 2 CPU 요구 (08의 requests)
+              memory: "2Gi"

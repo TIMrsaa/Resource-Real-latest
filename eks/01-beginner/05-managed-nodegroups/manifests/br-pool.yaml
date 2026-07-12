@@ -1,0 +1,16 @@
+# Source: eks/01-beginner/05-managed-nodegroups/lab-02-ami-updates.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata: { name: $CLUSTER, region: $AWS_REGION }
+managedNodeGroups:
+- name: br-test
+  amiFamily: Bottlerocket
+  instanceType: t3.medium
+  desiredCapacity: 1
+  minSize: 0
+  maxSize: 1
+  labels: { pool: br }
+  taints: [{ key: pool, value: br, effect: NoSchedule }]

@@ -1,0 +1,24 @@
+# Source: observability/01-beginner/05-events-and-signals-map/lab-01-events-and-audit.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        apiServer:
+          extraArgs:
+            audit-policy-file: /etc/kubernetes/audit/policy.yaml
+            audit-log-path: /var/log/kubernetes/audit.log
+          extraVolumes:
+            - name: audit
+              hostPath: /etc/kubernetes/audit
+              mountPath: /etc/kubernetes/audit
+              readOnly: true
+            - name: audit-log
+              hostPath: /var/log/kubernetes
+              mountPath: /var/log/kubernetes
+    extraMounts:
+      - hostPath: /tmp/audit
+        containerPath: /etc/kubernetes/audit

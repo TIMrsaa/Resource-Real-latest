@@ -1,0 +1,15 @@
+# Source: cncf/03-advanced/24-istio/lab-02-security-and-ambient.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: outsider
+  namespace: demo
+  labels: { run: outsider }
+  annotations:
+    sidecar.istio.io/inject: "false"    # ← 사이드카 주입 거부 = 메시 밖 신원 없는 클라이언트
+spec:
+  containers:
+    - name: outsider
+      image: curlimages/curl
+      command: ["sleep", "300"]

@@ -1,0 +1,8 @@
+# Source: cncf/02-intermediate/17-flux/lab-02-image-automation-and-tenancy.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImageRepository
+metadata: { name: podinfo, namespace: flux-system }
+spec:
+  image: ghcr.io/stefanprodan/podinfo
+  interval: 2m

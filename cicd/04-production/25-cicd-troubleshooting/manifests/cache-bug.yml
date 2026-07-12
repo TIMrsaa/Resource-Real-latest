@@ -1,0 +1,18 @@
+# Source: cicd/04-production/25-cicd-troubleshooting/lab-01-break-and-diagnose.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+name: cache-bug
+on: [push, workflow_dispatch]
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: deps/
+          key: deps-cache-v1            # 🐛 고정 키 — 입력(package.json)이 키에 없습니다!
+      - name: 의존성 "설치" (캐시 없을 때만)
+        run: |
+          [ -d deps ] || { mkdir deps; cp package.json deps/installed.json; echo "실제 설치 수행"; }
+          echo "=== 사용 중인 의존성 ==="; cat deps/installed.json

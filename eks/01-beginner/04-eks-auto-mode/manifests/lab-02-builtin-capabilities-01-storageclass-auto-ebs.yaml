@@ -1,0 +1,8 @@
+# Source: eks/01-beginner/04-eks-auto-mode/lab-02-builtin-capabilities.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata: { name: auto-ebs }
+provisioner: ebs.csi.eks.amazonaws.com        # ★ Auto Mode 내장 프로비저너
+volumeBindingMode: WaitForFirstConsumer
+parameters: { type: gp3 }

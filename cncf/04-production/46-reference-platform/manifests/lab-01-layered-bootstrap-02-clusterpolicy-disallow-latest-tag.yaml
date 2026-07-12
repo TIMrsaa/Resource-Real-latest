@@ -1,0 +1,16 @@
+# Source: cncf/04-production/46-reference-platform/lab-01-layered-bootstrap.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: disallow-latest-tag }
+spec:
+  rules:
+    - name: require-image-tag
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      validate:
+        failureAction: Audit
+        message: "latest 태그 금지"
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"

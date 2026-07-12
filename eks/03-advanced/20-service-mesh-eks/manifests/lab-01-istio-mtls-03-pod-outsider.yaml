@@ -1,0 +1,12 @@
+# Source: eks/03-advanced/20-service-mesh-eks/lab-01-istio-mtls.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: outsider              # default ns — 사이드카 주입 없음
+  labels: { run: outsider }
+spec:
+  containers:
+    - name: outsider
+      image: ghcr.io/stefanprodan/podinfo:6.7.1
+      command: ["sleep", "3600"]

@@ -1,0 +1,27 @@
+# Source: cncf/02-intermediate/19-cert-manager/lab-02-internal-ca-and-rotation.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ① 자기서명 Issuer (루트 CA를 만들기 위한 부트스트랩)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata: { name: selfsigned }
+spec: { selfSigned: {} }
+---
+# ② 루트 CA 인증서 (isCA: true)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: { name: internal-root, namespace: cert-manager }
+spec:
+  isCA: true
+  commonName: internal-root-ca
+  secretName: internal-root-ca
+  issuerRef: { name: selfsigned, kind: ClusterIssuer }
+  privateKey: { algorithm: ECDSA, size: 256 }
+  duration: 87600h        # 10년
+  renewBefore: 8760h
+---
+# ③ 그 CA로 서명하는 Issuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata: { name: internal-ca }
+spec:
+  ca: { secretName: internal-root-ca }

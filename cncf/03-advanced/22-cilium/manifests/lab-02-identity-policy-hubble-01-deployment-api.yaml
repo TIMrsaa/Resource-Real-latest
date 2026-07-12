@@ -1,0 +1,53 @@
+# Source: cncf/03-advanced/22-cilium/lab-02-identity-policy-hubble.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo
+  labels: { app: api }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: api }
+  template:
+    metadata:
+      labels: { app: api }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: demo
+spec:
+  selector: { app: api }
+  ports:
+    - port: 80
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: frontend
+  namespace: demo
+  labels: { app: frontend }
+spec:
+  containers:
+    - name: frontend
+      image: nicolaka/netshoot
+      command: ["sleep", "3600"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: attacker
+  namespace: demo
+  labels: { app: attacker }
+spec:
+  containers:
+    - name: attacker
+      image: nicolaka/netshoot
+      command: ["sleep", "3600"]

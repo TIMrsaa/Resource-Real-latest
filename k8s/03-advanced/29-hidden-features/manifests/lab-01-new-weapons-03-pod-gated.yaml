@@ -1,0 +1,10 @@
+# Source: k8s/03-advanced/29-hidden-features/lab-01-new-weapons.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata: { name: gated }
+spec:
+  schedulingGates:
+  - name: example.com/budget-approval        # "예산 승인까지 배치 보류"
+  containers:
+  - { name: c, image: public.ecr.aws/docker/library/busybox:stable, command: [sleep, "300"] }

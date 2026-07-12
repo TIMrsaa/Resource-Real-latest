@@ -1,0 +1,42 @@
+{{/*
+=============================================================================
+hpa.yaml — HorizontalPodAutoscaler (CPU 사용률 기반 Pod 수 자동 조절)
+=============================================================================
+HPA 동작:
+  주기적으로(기본 15초) metrics-server에서 Pod CPU/메모리 평균 읽음
+  → 목표값(targetCPUUtilizationPercentage)과 비교
+  → 모자라면 replicas 증가, 많으면 감소
+
+전제 조건:
+  • metrics-server 가 클러스터에 설치돼 있어야 함
+  • Pod에 resources.requests.cpu 가 설정돼 있어야 함 (HPA의 분모)
+
+KEDA와 차이:
+  • HPA: CPU/메모리 등 리소스 메트릭에만 반응
+  • KEDA: SQS 큐 길이, Kafka 랙, Prometheus 쿼리 등 임의 메트릭에 반응
+         (KEDA는 내부적으로 HPA를 만들어 동작)
+=============================================================================
+*/}}
+{{- if .Values.autoscaling.enabled }}    {{/* values.yaml에서 켰을 때만 렌더 */}}
+apiVersion: autoscaling/v2               {{/* v2 = 다양한 메트릭 지원 (v1은 CPU만) */}}
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "order-service.fullname" . }}
+  labels:
+    {{- include "order-service.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:                        {{/* 어떤 워크로드를 스케일링? */}}
+    apiVersion: apps/v1
+    kind: Deployment                     {{/* StatefulSet도 가능 */}}
+    name: {{ include "order-service.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}    {{/* 절대 이 아래로 안 내려감 */}}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}    {{/* 절대 이 위로 안 올라감 */}}
+  metrics:
+    - type: Resource                     {{/* Resource = CPU/메모리. 다른: Pods, Object, External */}}
+      resource:
+        name: cpu
+        target:
+          type: Utilization              {{/* Utilization = requests 대비 % / AverageValue = 절대값 */}}
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+                                         {{/* 70 → Pod 평균 CPU가 requests의 70% 넘으면 스케일아웃 */}}
+{{- end }}

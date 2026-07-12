@@ -1,0 +1,16 @@
+# Source: eks/01-beginner/04-eks-auto-mode/lab-01-enable-automode.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: auto-test }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: auto-test } }
+  template:
+    metadata: { labels: { app: auto-test } }
+    spec:
+      nodeSelector: { eks.amazonaws.com/compute-type: auto }
+      containers:
+      - name: web
+        image: public.ecr.aws/nginx/nginx:1.27
+        resources: { requests: { cpu: 500m, memory: 512Mi } }

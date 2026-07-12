@@ -1,0 +1,46 @@
+{{/*
+=============================================================================
+ingress.yaml — Ingress (외부 HTTP → Service 라우팅 규칙)
+=============================================================================
+Ingress vs Service(LoadBalancer):
+  • Service(LB): Service 1개당 LB 1개 (= 비용 ↑, 도메인 관리 어려움)
+  • Ingress    : 1개 LB로 여러 Service 분기 (호스트/경로 기반)
+
+EKS의 경우:
+  • ingressClassName: alb  → AWS Load Balancer Controller가 ALB 생성
+  • ingressClassName: nginx → ingress-nginx Controller (Pod로 동작)
+
+ALB 사용 시 필수 어노테이션 예:
+  alb.ingress.kubernetes.io/scheme: internet-facing
+  alb.ingress.kubernetes.io/target-type: ip
+  alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+=============================================================================
+*/}}
+{{- if .Values.ingress.enabled }}        {{/* values.yaml에서 켰을 때만 */}}
+apiVersion: networking.k8s.io/v1         {{/* extensions/v1beta1 은 deprecated! */}}
+kind: Ingress
+metadata:
+  name: {{ include "order-service.fullname" . }}
+  labels:
+    {{- include "order-service.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}    {{/* annotations이 비어있지 않을 때만 */}}
+  annotations:
+    {{- toYaml . | nindent 4 }}              {{/* values.yaml의 맵을 그대로 YAML로 */}}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}    {{/* 어떤 Ingress Controller가 처리? */}}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}     {{/* 이 도메인으로 들어오면 */}}
+      http:
+        paths:
+          - path: {{ .Values.ingress.path }}     {{/* 이 경로 매칭 시 */}}
+            pathType: {{ .Values.ingress.pathType }}
+                                                  {{/* Prefix: 시작 일치 / Exact: 완전 일치 */}}
+            backend:
+              service:
+                name: {{ include "order-service.fullname" . }}    {{/* 이 Service로 보냄 */}}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

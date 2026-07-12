@@ -1,0 +1,11 @@
+# Source: cicd/04-production/24-enterprise-patterns/lab-02-policy-as-code.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+name: bad-example
+on: { pull_request_target: {} }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: some-vendor/cool-action@v2
+      - run: export AWS_KEY=AKIAIOSFODNN7EXAMPLE

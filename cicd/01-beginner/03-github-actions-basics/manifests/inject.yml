@@ -1,0 +1,26 @@
+# Source: cicd/01-beginner/03-github-actions-basics/lab-01-first-workflow.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: inject-demo
+on:
+  workflow_dispatch:
+    inputs:
+      title:
+        description: 'PR 제목을 흉내 (예: a"; echo PWNED; #)'
+        default: "normal title"
+jobs:
+  unsafe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 취약 — 표현식이 셸 코드가 됩니다
+        run: |
+          echo "제목: ${{ github.event.inputs.title }}"
+  safe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 안전 — env 경유
+        env:
+          TITLE: ${{ github.event.inputs.title }}
+        run: |
+          echo "제목: $TITLE"

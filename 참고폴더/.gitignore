@@ -1,0 +1,33 @@
+# Local secrets
+*.pem
+*.key
+*-credentials.json
+.env
+.env.local
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!example.tfvars
+
+# Go
+*.exe
+*.test
+*.out
+vendor/
+bin/
+
+# kubeconfig
+kubeconfig
+*.kubeconfig
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+
+# Output
+*.log
+output/

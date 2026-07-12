@@ -1,0 +1,19 @@
+# Source: cncf/03-advanced/32-kyverno/lab-02-opa-vs-kyverno.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: require-resources }
+spec:
+  rules:
+    - name: require-limits
+      match: { any: [{ resources: { kinds: [Pod] } }] }
+      validate:
+        failureAction: Audit
+        message: "resource limits required"
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  limits:
+                    memory: "?*"    # 아무 값이나 있어야 (와일드카드)
+                    cpu: "?*"

@@ -1,0 +1,13 @@
+# Source: k8s/01-beginner/03-pod/lab-02-init-sidecar-lifecycle.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: stubborn
+  labels: { run: stubborn }
+spec:
+  terminationGracePeriodSeconds: 10
+  containers:
+    - name: stubborn
+      image: public.ecr.aws/docker/library/busybox:stable
+      command: ["sh", "-c", 'trap "echo got SIGTERM but ignoring" TERM; while true; do sleep 1; done']

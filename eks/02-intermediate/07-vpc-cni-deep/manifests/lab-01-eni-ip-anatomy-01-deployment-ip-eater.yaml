@@ -1,0 +1,23 @@
+# Source: eks/02-intermediate/07-vpc-cni-deep/lab-01-eni-ip-anatomy.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ip-eater
+  labels: { app: ip-eater }
+spec:
+  replicas: 10
+  selector:
+    matchLabels: { app: ip-eater }
+  template:
+    metadata:
+      labels: { app: ip-eater }
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: $NODE       # 관찰 중인 그 노드에만 배치
+      containers:
+        - name: ip-eater
+          image: public.ecr.aws/docker/library/busybox:stable
+          command: ["sleep", "3600"]

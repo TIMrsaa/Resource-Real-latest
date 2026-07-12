@@ -1,0 +1,16 @@
+# Source: cicd/02-intermediate/07-gha-oidc-aws/lab-01-oidc-setup.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: inspect-token
+on: workflow_dispatch
+permissions: { id-token: write, contents: read }
+jobs:
+  peek:
+    runs-on: ubuntu-latest
+    steps:
+      - name: OIDC 토큰의 클레임 (서명 제외, 값은 마스킹 주의)
+        run: |
+          TOKEN=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
+          echo "$TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq '{iss, aud, sub, repository, ref, exp}'

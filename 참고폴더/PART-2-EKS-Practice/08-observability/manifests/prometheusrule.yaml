@@ -1,0 +1,73 @@
+# =============================================================================
+# prometheusrule.yaml — Prometheus 알람 규칙 (kube-prometheus-stack용)
+# =============================================================================
+# PrometheusRule이란?
+#   Prometheus Operator의 CRD. PromQL 표현식으로 알람을 정의.
+#   Prometheus가 주기적으로 expr을 평가 → for 시간 동안 참이면 firing
+#
+# 알람 흐름:
+#   PrometheusRule (이 파일)
+#       ↓ Prometheus Operator가 ConfigMap 생성
+#   Prometheus 서버가 expr 평가
+#       ↓ for 시간 동안 참이면
+#   Alertmanager로 발송
+#       ↓ routing 규칙에 따라
+#   Slack / 이메일 / PagerDuty 등
+#
+# 라벨 'release: kps' 가 중요!
+#   kube-prometheus-stack(helm release name=kps)이 이 라벨로 자기 PrometheusRule을
+#   인식. 이 라벨 없으면 무시됨.
+#
+# 적용:  kubectl apply -f prometheusrule.yaml
+# 확인:  Prometheus UI → Status → Rules
+#       또는 kubectl get prometheusrules -n monitoring
+# =============================================================================
+
+apiVersion: monitoring.coreos.com/v1     # Prometheus Operator 의 CRD
+kind: PrometheusRule
+metadata:
+  name: eks-study-app-rules
+  namespace: monitoring                  # kube-prometheus-stack이 사는 NS
+  labels:
+    release: kps                         # ← 핵심! Prometheus가 이 라벨로 픽업
+
+spec:
+  groups:                                # 규칙 그룹 (관련 alert을 묶음)
+    - name: app.rules
+      rules:
+        # ── Alert 1: CPU 사용률이 높음 ──
+        - alert: HighCPUUsage
+          # PromQL: 컨테이너 CPU 사용량 / CPU limit > 0.8
+          # rate(...[2m])  : 2분 평균 증가율 (counter → rate)
+          # sum by(pod, namespace) : pod 단위로 합산
+          expr: |
+            sum(rate(container_cpu_usage_seconds_total{namespace!="kube-system",container!=""}[2m])) by (pod, namespace)
+              / sum(container_spec_cpu_quota{container!=""}/100000) by (pod, namespace) > 0.8
+          for: 2m                        # 2분 연속 참이어야 발화 (잠깐 spike는 무시)
+          labels:
+            severity: warning            # Alertmanager routing 키로 사용
+          annotations:                   # 알림 메시지 (템플릿 변수 사용 가능)
+            summary: "High CPU on {{ $labels.namespace }}/{{ $labels.pod }}"
+            description: "CPU usage above 80% of limit for 2 minutes"
+
+        # ── Alert 2: Pod이 CrashLoopBackOff ──
+        - alert: PodCrashLooping
+          # 5분간 재시작 횟수의 rate가 0보다 큼 = 재시작 중
+          # * 60 * 5 = 5분 동안의 재시작 횟수로 변환
+          expr: rate(kube_pod_container_status_restarts_total[5m]) * 60 * 5 > 0
+          for: 5m
+          labels:
+            severity: critical           # critical은 즉시 호출
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+
+        # ── Alert 3: 노드가 NotReady ──
+        - alert: NodeNotReady
+          # kube-state-metrics가 노드 상태를 게이지로 노출
+          # condition=Ready, status=true 가 0 → 노드 죽음
+          expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+          for: 5m                        # 일시적 NotReady는 무시 (재시작 등)
+          labels:
+            severity: critical
+          annotations:
+            summary: "Node {{ $labels.node }} not ready"

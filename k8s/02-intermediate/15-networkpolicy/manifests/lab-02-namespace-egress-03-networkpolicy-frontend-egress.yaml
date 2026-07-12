@@ -1,0 +1,11 @@
+# Source: k8s/02-intermediate/15-networkpolicy/lab-02-namespace-egress.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: frontend-egress, namespace: shop }
+spec:
+  podSelector: { matchLabels: { app: frontend } }
+  policyTypes: [Egress]
+  egress:
+  - to: [{ podSelector: { matchLabels: { app: api } } }]
+    ports: [{ protocol: TCP, port: 8080 }]

@@ -1,0 +1,21 @@
+# Source: observability/02-intermediate/12-loki-tempo-stack/lab-01-loki-tempo-setup.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata: { name: gateway, namespace: observability }
+spec:
+  mode: deployment
+  config:
+    receivers:
+      otlp: { protocols: { grpc: {}, http: {} } }
+    processors:
+      memory_limiter: { check_interval: 1s, limit_percentage: 75, spike_limit_percentage: 20 }
+      k8sattributes: {}
+      batch: {}
+    exporters:
+      otlp/tempo:
+        endpoint: tempo.monitoring.svc.cluster.local:4317   # ★ debug → Tempo!
+        tls: { insecure: true }
+    service:
+      pipelines:
+        traces: { receivers: [otlp], processors: [memory_limiter, k8sattributes, batch], exporters: [otlp/tempo] }

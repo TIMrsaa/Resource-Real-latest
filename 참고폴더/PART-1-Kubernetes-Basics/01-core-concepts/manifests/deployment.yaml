@@ -1,0 +1,61 @@
+# =============================================================================
+# deployment.yaml — 실무 표준 워크로드 (Deployment + ReplicaSet + Pod)
+# =============================================================================
+# 동작 흐름:
+#   Deployment ─생성/갱신→ ReplicaSet ─유지→ Pod (replicas 개수만큼)
+#
+# 이미지 변경 시 (kubectl set image deploy/web nginx=nginx:1.28) 어떻게 되나?
+#   1) 새 ReplicaSet(v2) 생성, replicas=0 부터 시작
+#   2) v2 replicas++, v1 replicas-- 를 maxSurge/maxUnavailable 한도 내에서 반복
+#   3) v2가 목표치 도달, v1은 0으로 → 무중단 배포 완료
+#
+# 적용:  kubectl apply -f deployment.yaml
+# 확인:  kubectl get deploy,rs,pod
+# 롤백:  kubectl rollout undo deploy/web
+# =============================================================================
+
+apiVersion: apps/v1             # Deployment는 apps/v1 그룹 (Pod의 v1과 다름!)
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  replicas: 3                   # 항상 3개의 Pod이 떠있도록 유지 (선언적 의도)
+  selector:                     # 이 Deployment가 "내 것"으로 인식할 Pod의 라벨 조건
+    matchLabels:
+      app: web                  # 아래 template.metadata.labels와 반드시 일치!
+  strategy:                     # 새 버전 배포 시 교체 방식
+    type: RollingUpdate         # (기본값) 점진적 교체. 다른 옵션: Recreate (전부 죽이고 새로 띄움)
+    rollingUpdate:
+      maxSurge: 1               # 평소 replicas(3)보다 최대 1개 더 떠도 됨 → 잠깐 4개
+      maxUnavailable: 0         # 0개는 항상 떠있어야 함 → 무중단 보장 (3 → 4 → 3 → 4 → 3)
+  template:                     # 새 Pod를 만들 때 쓸 템플릿 (Pod spec 그대로)
+    metadata:
+      labels:
+        app: web                # selector.matchLabels 와 일치 필수
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { cpu: 200m, memory: 128Mi }
+          # ── 두 종류 헬스체크 ──────────────────────────────────────
+          # readinessProbe: "이 컨테이너 트래픽 받을 준비됐나?"
+          #   실패 → Service의 endpoint에서 빠짐 (Pod는 안 죽임)
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 5    # 5초마다 체크
+          # livenessProbe: "이 컨테이너 살아있나?"
+          #   실패 → 컨테이너 재시작 (Pod 재시작 카운트 ↑)
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10  # 부팅 시간 고려해 첫 체크 10초 미룸
+            periodSeconds: 10

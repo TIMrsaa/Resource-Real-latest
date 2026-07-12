@@ -1,0 +1,24 @@
+# Source: k8s/02-intermediate/14-probes-lifecycle/lab-02-graceful-shutdown.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: loader
+  labels: { run: loader }
+spec:
+  containers:
+    - name: loader
+      image: public.ecr.aws/docker/library/busybox:stable
+      command:
+        - sh
+        - -c
+        - |
+          i=0; fail=0
+          while true; do
+            i=$((i+1))
+            wget -q -T 2 -O- http://probe-demo/hostname >/dev/null 2>&1 || { fail=$((fail+1)); echo "FAIL #$fail (req $i)"; }
+            [ $((i % 200)) -eq 0 ] && echo "progress: $i reqs, $fail fails"
+            sleep 0.05
+          done

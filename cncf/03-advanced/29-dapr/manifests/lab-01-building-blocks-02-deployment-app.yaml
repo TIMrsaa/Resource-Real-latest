@@ -1,0 +1,21 @@
+# Source: cncf/03-advanced/29-dapr/lab-01-building-blocks.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: app }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: app } }
+  template:
+    metadata:
+      labels: { app: app }
+      annotations:
+        dapr.io/enabled: "true"        # ★ 사이드카 주입
+        dapr.io/app-id: "myapp"
+        dapr.io/app-port: "8080"
+    spec:
+      containers:
+        - name: app
+          image: curlimages/curl
+          command: ["sleep","3600"]
+          ports: [{ containerPort: 8080 }]

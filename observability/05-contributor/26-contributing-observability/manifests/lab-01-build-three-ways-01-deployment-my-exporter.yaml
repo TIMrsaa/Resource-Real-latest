@@ -1,0 +1,28 @@
+# Source: observability/05-contributor/26-contributing-observability/lab-01-build-three-ways.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-exporter
+  labels: { app: my-exporter }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: my-exporter }
+  template:
+    metadata:
+      labels: { app: my-exporter }
+    spec:
+      containers:
+        - name: my-exporter
+          image: my-exporter:dev
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-exporter
+  labels: { app: my-exporter }       # ServiceMonitor selector가 보는 라벨
+spec:
+  selector: { app: my-exporter }
+  ports:
+    - port: 9500

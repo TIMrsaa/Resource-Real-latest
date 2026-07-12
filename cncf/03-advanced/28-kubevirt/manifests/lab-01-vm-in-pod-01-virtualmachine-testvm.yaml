@@ -1,0 +1,24 @@
+# Source: cncf/03-advanced/28-kubevirt/lab-01-vm-in-pod.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata: { name: testvm }
+spec:
+  running: true
+  template:
+    metadata: { labels: { kubevirt.io/vm: testvm } }
+    spec:
+      domain:
+        cpu: { cores: 1 }
+        resources: { requests: { memory: 512Mi } }
+        devices:
+          disks:
+            - { name: containerdisk, disk: { bus: virtio } }
+          interfaces:
+            - { name: default, masquerade: {} }
+      networks:
+        - { name: default, pod: {} }
+      volumes:
+        - name: containerdisk
+          containerDisk:
+            image: quay.io/kubevirt/cirros-container-disk-demo   # 작은 테스트 이미지

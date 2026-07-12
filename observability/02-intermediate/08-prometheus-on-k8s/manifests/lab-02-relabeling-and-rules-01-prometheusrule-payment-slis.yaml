@@ -1,0 +1,20 @@
+# Source: observability/02-intermediate/08-prometheus-on-k8s/lab-02-relabeling-and-rules.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: payment-slis
+  namespace: shop
+  labels: { release: monitoring }     # ruleSelector 매칭 (역시 사슬!)
+spec:
+  groups:
+    - name: payment.sli
+      interval: 30s
+      rules:
+        - record: service:http_requests:rate5m
+          expr: sum by (namespace) (rate(http_requests_total[5m]))
+        - record: service:http_error_ratio:rate5m
+          expr: |
+            sum by (namespace) (rate(http_requests_total{code=~"5.."}[5m]))
+            /
+            sum by (namespace) (rate(http_requests_total[5m]))

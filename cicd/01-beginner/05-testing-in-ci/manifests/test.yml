@@ -1,0 +1,46 @@
+# Source: cicd/01-beginner/05-testing-in-ci/lab-01-pyramid-and-doubles.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: test
+on: [push, pull_request]
+permissions: { contents: read }
+
+jobs:
+  unit:                                # 빠르고 결정적 — 항상 먼저
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install pytest
+      - run: pytest -q tests/test_unit.py
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: test }
+        ports: ["5432:5432"]
+        options: >-                    # ★ 헬스체크 없으면 "DB 아직 안 떴는데 테스트 시작" flaky
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DSN: postgresql://postgres:test@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install pytest "psycopg[binary]"
+      - run: pytest -q tests/test_integration.py
+
+  ci:                                  # 03의 수렴 잡 패턴
+    if: always()
+    needs: [unit, integration]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [ "${{ needs.unit.result }}" = "success" ] && [ "${{ needs.integration.result }}" = "success" ]

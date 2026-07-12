@@ -1,0 +1,16 @@
+# Source: eks/03-advanced/15-custom-metrics-hpa/lab-02-keda.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: podinfo, namespace: scalelab }
+spec:
+  scaleTargetRef: { name: podinfo }
+  minReplicaCount: 2
+  maxReplicaCount: 8
+  cooldownPeriod: 120
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus-server.monitoring.svc
+      query: sum(rate(http_request_duration_seconds_count{namespace="scalelab"}[1m]))
+      threshold: "50"            # replica당 목표 — lab-01의 averageValue와 같은 의미

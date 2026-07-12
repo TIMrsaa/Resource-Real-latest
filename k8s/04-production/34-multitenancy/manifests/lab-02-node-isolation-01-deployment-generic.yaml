@@ -1,0 +1,29 @@
+# Source: k8s/04-production/34-multitenancy/lab-02-node-isolation.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: generic
+  namespace: team-galaxy
+  labels: { app: generic }
+spec:
+  replicas: 4
+  selector:
+    matchLabels: { app: generic }
+  template:
+    metadata:
+      labels: { app: generic }
+    spec:
+      # PSA baseline 통과용 securityContext (lab-01에서 확인한 그 규칙)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: busybox
+          image: public.ecr.aws/docker/library/busybox:stable
+          command: ["sleep", "600"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

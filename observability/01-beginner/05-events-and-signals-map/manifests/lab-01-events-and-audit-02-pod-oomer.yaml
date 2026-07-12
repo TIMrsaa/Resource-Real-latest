@@ -1,0 +1,11 @@
+# Source: observability/01-beginner/05-events-and-signals-map/lab-01-events-and-audit.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata: { name: oomer }
+spec:
+  containers:
+    - name: c
+      image: busybox
+      command: ["sh","-c","head -c 200m /dev/zero | tail; sleep 3600"]
+      resources: { limits: { memory: "64Mi" } }

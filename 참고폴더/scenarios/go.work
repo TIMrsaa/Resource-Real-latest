@@ -1,0 +1,10 @@
+go 1.25
+
+use (
+	./frontend
+	./notification-service
+	./order-service
+	./payment-service
+	./shared
+	./user-service
+)

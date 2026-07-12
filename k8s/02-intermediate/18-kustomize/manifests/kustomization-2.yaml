@@ -1,0 +1,23 @@
+# Source: k8s/02-intermediate/18-kustomize/lab-01-base-overlay.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../../base
+namespace: kz-prod
+patches:
+- path: replicas-patch.yaml                  # strategic merge
+- target: { kind: Deployment, name: web }    # JSON6902
+  patch: |-
+    - op: add
+      path: /spec/template/spec/containers/0/resources
+      value:
+        requests: { cpu: 200m, memory: 128Mi }
+        limits: { memory: 256Mi }
+    - op: add
+      path: /spec/template/spec/topologySpreadConstraints
+      value:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector: { matchLabels: { app: web } }

@@ -1,0 +1,8 @@
+# Source: cncf/02-intermediate/18-keda/lab-02-scalers-and-jobs.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata: { name: rabbit-auth }
+spec:
+  secretTargetRef:
+    - { parameter: host, name: rabbit-conn, key: host }

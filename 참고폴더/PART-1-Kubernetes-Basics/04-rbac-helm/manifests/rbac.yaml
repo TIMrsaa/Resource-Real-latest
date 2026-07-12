@@ -1,0 +1,87 @@
+# =============================================================================
+# rbac.yaml — ServiceAccount + Role + RoleBinding (Pod에 권한 부여)
+# =============================================================================
+# RBAC = Role-Based Access Control
+# "누가 / 무엇에 / 어떤 행위를" 할 수 있는지 정의하는 K8s 권한 시스템
+#
+# 4가지 객체:
+#   • Role / ClusterRole       : 권한의 묶음 (정책)
+#   • RoleBinding / ClusterRoleBinding : 누구에게 그 정책을 부여할지
+#
+# Role vs ClusterRole:
+#   • Role         : 특정 NS에서만 유효 (NS-scoped)
+#   • ClusterRole  : 클러스터 전체 또는 cluster-scoped 리소스(Node 등)에
+#
+# 누구(Subject)?
+#   • User / Group        : 외부 사용자 (kubectl 쓰는 사람)
+#   • ServiceAccount      : Pod이 K8s API 호출할 때 쓰는 계정 ← 이번 예제
+#
+# 흐름 (이 파일):
+#   1) ServiceAccount 'pod-reader-sa' 생성
+#   2) Role 'pod-reader' 생성 (pods를 get/list/watch 할 권한)
+#   3) RoleBinding으로 SA에 Role 부여
+#   4) Pod이 그 SA를 사용 → kubectl get pods 가 됨
+#
+# 적용:  kubectl apply -f rbac.yaml
+# 테스트: kubectl exec -it rbac-test -- kubectl get pods
+#         (성공) ↔ kubectl exec -it rbac-test -- kubectl get nodes (실패: 권한 없음)
+# =============================================================================
+
+# ── ServiceAccount ────────────────────────────────────────────────
+# Pod이 K8s API를 호출할 때 쓰는 "계정". IRSA로 AWS IAM과도 연결 가능
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pod-reader-sa
+  namespace: default            # NS-scoped 객체. 다른 NS에선 못 씀
+
+---
+# ── Role: 권한 명세 ───────────────────────────────────────────────
+# "default NS에서 pods, pods/log를 get/list/watch 할 수 있다"
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-reader
+  namespace: default
+rules:                          # 권한 규칙 (여러 개 가능)
+  - apiGroups: [""]             # core API group(v1)은 빈 문자열로 표기
+                                # 다른 예: ["apps"] (Deployment), ["rbac.authorization.k8s.io"]
+    resources: ["pods", "pods/log"]   # 어떤 리소스에?
+                                      # pods/log = 로그 서브리소스 (kubectl logs용)
+    verbs: ["get", "list", "watch"]   # 어떤 동작?
+    # verbs 종류: get, list, watch, create, update, patch, delete, deletecollection
+    # readonly = get/list/watch / readwrite = 위 + create/update/patch/delete
+
+---
+# ── RoleBinding: SA에 Role 부여 ──────────────────────────────────
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-reader-binding
+  namespace: default
+subjects:                       # 누구에게 부여? (여러 명 가능)
+  - kind: ServiceAccount
+    name: pod-reader-sa
+    namespace: default
+  # User에게도 부여 가능:
+  # - kind: User
+  #   name: alice@example.com
+  #   apiGroup: rbac.authorization.k8s.io
+roleRef:                        # 어떤 Role을 부여?
+  kind: Role                    # ClusterRole이면 "ClusterRole"
+  name: pod-reader              # 위에서 만든 Role 이름
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ── 테스트용 Pod (kubectl이 들어있는 이미지로 RBAC 검증) ─────
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rbac-test
+spec:
+  serviceAccountName: pod-reader-sa   # ← 이 SA를 사용 (=권한 받음)
+                                      # 미지정 시 "default" SA가 쓰이고 보통 권한 없음
+  containers:
+    - name: kubectl
+      image: bitnami/kubectl:latest   # kubectl이 미리 설치된 이미지 (특정 버전 고정 시 docker hub 에서 사용 가능 태그 확인)
+      command: ["sh", "-c", "sleep 3600"]   # 1시간 살려둠 (테스트 시간)

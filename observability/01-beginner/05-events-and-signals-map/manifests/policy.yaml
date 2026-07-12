@@ -1,0 +1,10 @@
+# Source: observability/01-beginner/05-events-and-signals-map/lab-01-events-and-audit.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+  - level: Metadata
+    resources: [{ group: "", resources: ["secrets"] }]
+  - level: Request
+    verbs: ["delete", "create", "patch", "update"]
+  - level: None                # 나머지 (읽기 대량)는 기록 안 함

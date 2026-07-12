@@ -1,0 +1,68 @@
+# =============================================================================
+# cron-scaler.yaml — KEDA Cron 트리거 + Scale-to-Zero 시연
+# =============================================================================
+# 핵심 개념: Scale-to-Zero
+#   minReplicaCount: 0 → 트리거 비활성 시 Pod 0개로 줄임
+#   = 사용 안 할 땐 진짜 0개로 (= 0원)
+#   HPA로는 불가능한 KEDA만의 핵심 기능
+#
+# 사용 예:
+#   • 야간/주말에만 도는 배치 작업
+#   • 이벤트 큐가 비어있을 때 워커 Pod 전부 끄기
+#   • 데모 환경 (사용 시간대만 띄움)
+#
+# 이 파일은 "매 5분의 첫 1분만 Pod 띄우기" 데모:
+#   00:00~00:01 → 3개 Pod
+#   00:01~00:05 → 0개 Pod
+#   00:05~00:06 → 3개 Pod
+#   ...
+#
+# 시연:
+#   kubectl apply -f cron-scaler.yaml
+#   kubectl get pods -w   ← 5분 동안 0과 3 사이를 왕복
+# =============================================================================
+
+# ── Deployment (replicas: 0 으로 시작) ──────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cron-demo
+spec:
+  replicas: 0                      # 처음부터 0개 (KEDA가 cron으로 깨움)
+                                   # KEDA를 쓸 때 Deployment의 replicas는
+                                   # 사실상 무시되고 ScaledObject가 관리
+  selector:
+    matchLabels: {app: cron-demo}
+  template:
+    metadata:
+      labels: {app: cron-demo}
+    spec:
+      nodeSelector: {managed-by: karpenter}
+      containers:
+        - name: app
+          image: nginx:1.27        # 그냥 띄워두기만 (실제 일은 안 함)
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+
+---
+# ── KEDA ScaledObject ───────────────────────────────────────────
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: cron-demo
+spec:
+  scaleTargetRef:
+    name: cron-demo
+  minReplicaCount: 0               # ← 핵심: scale-to-zero
+                                   # cron 비활성 구간엔 0개로 내려감
+  maxReplicaCount: 5
+  cooldownPeriod: 60
+  triggers:
+    - type: cron                   # cron 트리거 (시간 기반)
+      metadata:
+        timezone: Asia/Seoul       # 한국 시간 기준
+        start: "*/5 * * * *"       # 매 5분 0초마다 활성 시작 (00, 05, 10, ...)
+        end:   "1-59/5 * * * *"    # 매 5분 1초마다 활성 종료 (01, 06, 11, ...)
+                                   # = 5분의 첫 1분만 활성
+        desiredReplicas: "3"       # 활성 구간 동안 3개 유지
+                                   # cron 비활성 + 다른 트리거 없음 → 0개로

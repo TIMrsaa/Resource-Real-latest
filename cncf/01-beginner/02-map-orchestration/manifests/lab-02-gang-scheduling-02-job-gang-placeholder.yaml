@@ -1,0 +1,22 @@
+# Source: cncf/01-beginner/02-map-orchestration/lab-02-gang-scheduling.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata: { name: gang-$JOB }
+spec:
+  schedulerName: volcano
+  minAvailable: 4                     # ★ 갱: 4개 전부 배치 가능할 때만 시작
+  queue: default
+  tasks:
+    - replicas: 4
+      name: worker
+      template:
+        spec:
+          containers:
+            - name: worker
+              image: busybox
+              command: ["sh","-c","echo all-or-nothing!; sleep 120"]
+              resources: { requests: { cpu: "700m" } }
+          restartPolicy: Never

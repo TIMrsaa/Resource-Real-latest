@@ -1,0 +1,23 @@
+# Source: cicd/03-advanced/16-tekton/lab-01-task-pipeline.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata: { name: build-test }
+spec:
+  params:
+    - name: message
+      default: "hello"
+  steps:
+    - name: compile                    # ← 컨테이너 1
+      image: golang:1.23-alpine
+      script: |
+        echo "[compile] $(params.message)"
+        echo 'package main; func main(){println("built")}' > /workspace/main.go
+        cd /workspace && go build -o app main.go && echo "빌드 완료"
+    - name: test                       # ← 컨테이너 2 (같은 Pod, 볼륨 공유)
+      image: golang:1.23-alpine
+      script: |
+        echo "[test] 앞 step이 만든 파일이 보이나요?"
+        ls -la /workspace/app && echo "✅ step 간 볼륨 공유 (03의 잡 내 스텝과 동형)"

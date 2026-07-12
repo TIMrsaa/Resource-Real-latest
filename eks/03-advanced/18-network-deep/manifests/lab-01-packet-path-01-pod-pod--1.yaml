@@ -1,0 +1,14 @@
+# Source: eks/03-advanced/18-network-deep/lab-01-packet-path.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-$1
+  namespace: netlab
+  labels: { run: pod-$1 }
+spec:
+  nodeName: $2                     # 스케줄러 우회 — 지정 노드에 강제 배치
+  containers:
+    - name: pod-$1
+      image: ghcr.io/nicolaka/netshoot:latest
+      command: ["sleep", "3600"]

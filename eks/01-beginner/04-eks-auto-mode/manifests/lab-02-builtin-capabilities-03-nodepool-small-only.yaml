@@ -1,0 +1,17 @@
+# Source: eks/01-beginner/04-eks-auto-mode/lab-02-builtin-capabilities.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata: { name: small-only }
+spec:
+  template:
+    spec:
+      requirements:
+      - { key: "eks.amazonaws.com/instance-category", operator: In, values: [t, m] }
+      - { key: "eks.amazonaws.com/instance-cpu", operator: In, values: ["2", "4"] }
+      - { key: "karpenter.sh/capacity-type", operator: In, values: [on-demand] }
+      nodeClassRef: { group: eks.amazonaws.com, kind: NodeClass, name: default }
+      taints:
+      - { key: pool, value: small, effect: NoSchedule }
+  limits: { cpu: "8" }                          # 이 풀의 총 CPU 상한 (폭주 방지!)
+  disruption: { consolidationPolicy: WhenEmptyOrUnderutilized }

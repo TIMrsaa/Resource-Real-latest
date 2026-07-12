@@ -1,0 +1,7 @@
+# Source: observability/03-advanced/14-amp-managed-prometheus/lab-02-rules-and-judgment.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+groups:
+  - name: cluster.record
+    rules:
+      - record: cluster:node_cpu:avg_idle
+        expr: avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))

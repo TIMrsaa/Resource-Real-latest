@@ -1,0 +1,59 @@
+# Source: cicd/03-advanced/20-monorepo-ci/lab-02-ci-integration.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: mono-ci
+on:
+  pull_request:
+  workflow_dispatch:
+permissions: { contents: read }
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.aff.outputs.projects }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }          # ★ affected는 base와의 diff가 필요 — 얕은 클론이면 계산 불가
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - id: aff
+        name: affected 계산 (base 대비)
+        run: |
+          BASE="${{ github.event.pull_request.base.sha || 'HEAD~1' }}"
+          PROJECTS=$(npx turbo ls --affected --output=json 2>/dev/null \
+            | jq -c '[.packages.items[].name]' || echo '[]')
+          echo "projects=$PROJECTS" >> "$GITHUB_OUTPUT"
+          echo "affected: $PROJECTS"
+        env:
+          TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha }}
+
+  test:
+    needs: detect
+    if: needs.detect.outputs.projects != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(needs.detect.outputs.projects) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - name: ${{ matrix.project }} 테스트
+        run: npx turbo run test --filter=${{ matrix.project }}
+
+  ci:                                     # ★ 03의 게이트 — required check는 이것 하나
+    needs: [detect, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 게이트 판정 (스킵은 통과, 실패만 차단)
+        run: |
+          echo "detect=${{ needs.detect.result }} test=${{ needs.test.result }}"
+          [[ "${{ needs.detect.result }}" == "success" ]] || exit 1
+          [[ "${{ needs.test.result }}" == "success" || "${{ needs.test.result }}" == "skipped" ]] || exit 1
+          echo "✅ gate pass"

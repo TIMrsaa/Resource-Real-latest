@@ -1,0 +1,44 @@
+# =============================================================================
+# loadbalancer.yaml — LoadBalancer Service (클라우드 LB 자동 생성)
+# =============================================================================
+# 동작:
+#   외부 인터넷 → AWS NLB(자동 생성) → 노드들 → Pod
+#
+# AWS에서는:
+#   type: LoadBalancer 적어두면 EKS의 Cloud Controller Manager가
+#   AWS API 호출해서 NLB(Network Load Balancer)를 자동 프로비저닝
+#   → ~2분 후 EXTERNAL-IP에 NLB DNS가 채워짐
+#
+# annotation으로 동작 미세 조정 가능 (보안 그룹, internal/internet-facing 등)
+#
+# 비용 주의:
+#   NLB는 시간당 ~$0.0225 + 처리 LCU 과금. 실습 후 즉시 삭제!
+#
+# 적용:  kubectl apply -f loadbalancer.yaml
+# 확인:  kubectl get svc web-lb -w
+#       (EXTERNAL-IP에 DNS 이름이 뜨면 약 2분 후 접근 가능)
+# 테스트: curl http://<EXTERNAL-IP>/
+# 삭제:  kubectl delete -f loadbalancer.yaml  ← 잊으면 NLB 비용 계속!
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-lb
+  annotations:
+    # ── 아래 어노테이션은 AWS Cloud Provider에 힌트를 줌 ──
+    # AWS Load Balancer Controller가 없어도 EKS는 기본 CCM이 NLB를 만들어 줌
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    # NLB 타깃 모드: ip = Pod IP를 직접 등록 (VPC CNI 필수)
+    #              instance = 노드 IP + NodePort로 등록
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    # internet-facing : 퍼블릭 IP 부여 (외부에서 접근)
+    # internal        : 사설 IP만 (VPC 내부 전용)
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+spec:
+  type: LoadBalancer            # 이 한 줄이 NLB 자동 생성 트리거
+  selector:
+    app: web                    # 앞서 만든 web Deployment의 Pod로 라우팅
+  ports:
+    - port: 80                  # LB의 외부 포트
+      targetPort: 80            # Pod의 포트

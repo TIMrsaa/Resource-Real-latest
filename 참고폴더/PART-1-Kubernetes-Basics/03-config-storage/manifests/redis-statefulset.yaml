@@ -1,0 +1,85 @@
+# =============================================================================
+# redis-statefulset.yaml — StatefulSet (상태 있는 워크로드)
+# =============================================================================
+# Deployment vs StatefulSet:
+#   Deployment: Pod 이름 랜덤 (web-abc123, web-def456). 순서 무관.
+#   StatefulSet: Pod 이름 고정 (redis-0, redis-1, redis-2). 순서대로 생성/삭제.
+#
+# StatefulSet이 보장하는 것:
+#   1) 안정적 이름 : redis-0 은 죽었다 살아도 redis-0
+#   2) 안정적 스토리지 : redis-0의 PVC는 redis-0에만 다시 붙음 (데이터 보존)
+#   3) 순서대로 생성 : redis-0 → 1 → 2 (병렬 X)
+#   4) 안정적 DNS : redis-0.redis-hl.default.svc.cluster.local
+#
+# 언제 쓰나?
+#   • DB (PostgreSQL, MySQL primary-replica)
+#   • 메시지 큐 (Kafka, RabbitMQ)
+#   • 분산 캐시 (Redis Cluster)
+#   • 어떤 Pod인지 식별이 중요한 워크로드
+#
+# Headless Service (clusterIP: None) 가 왜 필요?
+#   일반 Service는 가상 IP를 만들고 부하분산. 하지만 StatefulSet은
+#   "특정 Pod로 직접 접근" 이 필요 (redis-0에 PRIMARY, redis-1에 REPLICA 등)
+#   → Headless Service를 만들면 Pod별 DNS 레코드(redis-0.redis-hl) 가 생성됨
+#
+# 적용:  kubectl apply -f redis-statefulset.yaml
+# 확인:  kubectl get sts,pod,pvc
+# 테스트: kubectl exec -it redis-0 -- redis-cli set hello world
+#         kubectl delete pod redis-0   ← 재생성돼도 데이터 살아있음
+#         kubectl exec -it redis-0 -- redis-cli get hello
+# =============================================================================
+
+# ── Headless Service (Pod별 DNS 제공용) ─────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-hl
+  labels: { app: redis }
+spec:
+  clusterIP: None               # ← 핵심! 가상 IP 없음 = Headless
+                                #   대신 Pod별 DNS 레코드 자동 생성
+  selector: { app: redis }
+  ports:
+    - port: 6379
+      name: redis               # port에 이름 (StatefulSet에서 쓸 수 있게)
+
+---
+# ── StatefulSet ──────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+spec:
+  serviceName: redis-hl         # 위 Headless Service 참조 (DNS 도메인 형성)
+  replicas: 3                   # redis-0, redis-1, redis-2 생성됨
+  selector:
+    matchLabels: { app: redis }
+  template:
+    metadata:
+      labels: { app: redis }
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+              name: redis
+          volumeMounts:
+            - name: data            # 아래 volumeClaimTemplates의 이름과 매칭
+              mountPath: /data
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { cpu: 200m, memory: 128Mi }
+
+  # ── volumeClaimTemplates: Pod별로 PVC 자동 생성 ──
+  # StatefulSet의 핵심 기능. Pod이 N개면 PVC도 N개 생성됨
+  # (data-redis-0, data-redis-1, data-redis-2)
+  volumeClaimTemplates:
+    - metadata:
+        name: data                  # PVC 이름 prefix (data-redis-0 등으로 생성)
+      spec:
+        storageClassName: gp3       # 어떤 스토리지 클래스? (gp3 = AWS EBS)
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi            # Pod 하나당 1Gi EBS 자동 생성

@@ -1,0 +1,21 @@
+# Source: k8s/03-advanced/23-admission-webhooks/lab-01-cel-policies.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: { name: require-cost-label }
+spec:
+  matchConstraints:
+    resourceRules:
+    - {apiGroups: ["apps"], apiVersions: ["v1"], operations: ["CREATE"], resources: ["deployments"]}
+  validations:
+  - expression: "has(object.metadata.labels) && 'cost-center' in object.metadata.labels && object.metadata.labels['cost-center'].matches('^team-[a-z]+$')"
+    message: "metadata.labels에 cost-center=team-<이름> 필수"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata: { name: require-cost-label-binding }
+spec:
+  policyName: require-cost-label
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector: { matchLabels: { policy: enforced } }

@@ -1,0 +1,19 @@
+# Source: k8s/03-advanced/23-admission-webhooks/lab-01-cel-policies.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: good
+  namespace: vap-lab
+  labels: { app: good }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: good }
+  template:
+    metadata:
+      labels: { app: good }
+    spec:
+      containers:
+        - name: nginx
+          image: public.ecr.aws/nginx/nginx:1.27        # 명시적 태그 — 정책 통과

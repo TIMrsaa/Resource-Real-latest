@@ -1,0 +1,55 @@
+# Source: cicd/01-beginner/04-docker-build-ci/lab-02-ci-build-push.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: build
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}     # ★ 이후 배포가 쓸 값 (03의 outputs)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3        # BuildKit 빌더
+
+      - name: ECR 로그인
+        uses: aws-actions/amazon-ecr-login@v2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+
+      - name: 태그 결정 (불변)
+        id: meta
+        run: echo "tag=${{ vars.ECR_REPOSITORY }}:${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: 빌드 & 푸시
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tag }}
+          cache-from: |
+            type=gha
+            type=gha,scope=main
+          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
+
+      - name: 다이제스트 출력 — 배포는 이것으로
+        run: |
+          echo "tag    : ${{ steps.meta.outputs.tag }}"
+          echo "digest : ${{ steps.push.outputs.digest }}"
+          echo "배포 참조: ${{ vars.ECR_REPOSITORY }}@${{ steps.push.outputs.digest }}"

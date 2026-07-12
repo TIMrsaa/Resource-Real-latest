@@ -1,0 +1,17 @@
+# Source: cicd/04-production/24-enterprise-patterns/lab-01-approval-and-audit.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+name: deploy
+on: { push: { branches: [main] } }
+permissions: { contents: read }
+jobs:
+  deploy-prod:
+    runs-on: ubuntu-latest
+    environment: production          # ★ 승인 게이트가 여기 걸립니다
+    steps:
+      - uses: actions/checkout@v4
+      - name: 배포 기록 (감사의 재료 — 다이제스트까지)
+        run: |
+          echo "deploy sha=$(git rev-parse HEAD)"
+          echo "artifact-digest=sha256:$(git rev-parse HEAD | sha256sum | cut -c1-16)..."

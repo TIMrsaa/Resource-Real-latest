@@ -1,0 +1,35 @@
+# Source: observability/02-intermediate/12-loki-tempo-stack/lab-01-loki-tempo-setup.md
+# 이 파일은 위 실습 문서에서 사용한 매니페스트의 복사본입니다 (학습 편의용).
+# ⚠️ 셸 변수($VAR)가 포함되어 있습니다 — 실행 전 실제 값으로 치환하거나,
+#    원본 문서의 절차대로 export 후 envsubst 등으로 적용하세요.
+config:
+  service: |
+    [SERVICE]
+        Flush         1
+        HTTP_Server   On
+        HTTP_Port     2020
+        storage.path  /var/log/flb-storage/
+  inputs: |
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*.log
+        Tag               kube.*
+        multiline.parser  cri
+        DB                /var/log/flb_kube.db
+        storage.type      filesystem
+  filters: |
+    [FILTER]
+        Name              kubernetes
+        Match             kube.*
+        Merge_Log         On
+        Keep_Log          Off
+  outputs: |
+    [OUTPUT]
+        Name              loki
+        Match             kube.*
+        Host              loki.monitoring.svc.cluster.local
+        Port              3100
+        # ★ 라벨 선별 — 소수만 승격 (theory 1절의 규율)
+        labels            job=fluent-bit, namespace=$kubernetes['namespace_name'], app=$kubernetes['labels']['app']
+        auto_kubernetes_labels off
+        storage.total_limit_size 200M
